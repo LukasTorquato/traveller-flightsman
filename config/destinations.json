@@ -1,0 +1,47 @@
+{
+  "europe_short_haul": [
+    {"iata": "BCN", "city": "Barcelona"},
+    {"iata": "CDG", "city": "Paris"},
+    {"iata": "AMS", "city": "Amsterdam"},
+    {"iata": "BER", "city": "Berlin"},
+    {"iata": "LIS", "city": "Lisbon"},
+    {"iata": "MAD", "city": "Madrid"},
+    {"iata": "FCO", "city": "Rome"},
+    {"iata": "MXP", "city": "Milan"},
+    {"iata": "VIE", "city": "Vienna"},
+    {"iata": "PRG", "city": "Prague"},
+    {"iata": "BRU", "city": "Brussels"},
+    {"iata": "CPH", "city": "Copenhagen"},
+    {"iata": "ZRH", "city": "Zurich"},
+    {"iata": "WAW", "city": "Warsaw"},
+    {"iata": "BUD", "city": "Budapest"}
+  ],
+  "europe_long_haul": [
+    {"iata": "ATH", "city": "Athens"},
+    {"iata": "IST", "city": "Istanbul"},
+    {"iata": "OSL", "city": "Oslo"},
+    {"iata": "ARN", "city": "Stockholm"},
+    {"iata": "HEL", "city": "Helsinki"},
+    {"iata": "KEF", "city": "Reykjavik"},
+    {"iata": "TLV", "city": "Tel Aviv"},
+    {"iata": "SPU", "city": "Split"},
+    {"iata": "FNC", "city": "Madeira"},
+    {"iata": "TFS", "city": "Tenerife"}
+  ],
+  "intercontinental_asia": [
+    {"iata": "BKK", "city": "Bangkok"},
+    {"iata": "HND", "city": "Tokyo"},
+    {"iata": "SIN", "city": "Singapore"},
+    {"iata": "DEL", "city": "Delhi"},
+    {"iata": "KUL", "city": "Kuala Lumpur"},
+    {"iata": "HKG", "city": "Hong Kong"},
+    {"iata": "CGK", "city": "Jakarta"}
+  ],
+  "intercontinental_south_america": [
+    {"iata": "GRU", "city": "Sao Paulo"},
+    {"iata": "GIG", "city": "Rio de Janeiro"},
+    {"iata": "EZE", "city": "Buenos Aires"},
+    {"iata": "BOG", "city": "Bogota"},
+    {"iata": "LIM", "city": "Lima"}
+  ]
+}
