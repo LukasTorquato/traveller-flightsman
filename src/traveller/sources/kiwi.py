@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from datetime import date, datetime
 from typing import Any
 
@@ -42,11 +43,20 @@ def _parse_fare(entry: dict[str, Any]) -> Fare:
 
 
 class KiwiClient:
-    def __init__(self, *, api_key: str, timeout_s: float = 20.0):
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        timeout_s: float = 20.0,
+        backoff_seconds: float = 5.0,
+        max_retries: int = 2,
+    ):
         if not api_key:
             raise KiwiError("Kiwi API key is empty")
         self._api_key = api_key
         self._timeout_s = timeout_s
+        self._backoff_seconds = backoff_seconds
+        self._max_retries = max_retries
 
     def search(
         self,
@@ -73,15 +83,21 @@ class KiwiClient:
             "flight_type": "round",
         }
         headers = {"apikey": self._api_key, "accept": "application/json"}
-        try:
-            resp = httpx.get(
-                _SEARCH_URL, params=params, headers=headers, timeout=self._timeout_s
-            )
-        except httpx.HTTPError as exc:
-            raise KiwiError(f"Kiwi network error: {exc}") from exc
-        if resp.status_code != 200:
-            raise KiwiError(
-                f"Kiwi {resp.status_code}: {resp.text[:200]}"
-            )
-        payload = resp.json()
-        return [_parse_fare(e) for e in payload.get("data", [])]
+        last_status: int | None = None
+        last_text: str = ""
+        attempts = self._max_retries + 1
+        for attempt in range(attempts):
+            try:
+                resp = httpx.get(
+                    _SEARCH_URL, params=params, headers=headers, timeout=self._timeout_s
+                )
+            except httpx.HTTPError as exc:
+                raise KiwiError(f"Kiwi network error: {exc}") from exc
+            if resp.status_code == 200:
+                return [_parse_fare(e) for e in resp.json().get("data", [])]
+            last_status, last_text = resp.status_code, resp.text[:200]
+            if resp.status_code == 429 and attempt < attempts - 1:
+                time.sleep(self._backoff_seconds)
+                continue
+            break
+        raise KiwiError(f"Kiwi {last_status}: {last_text}")

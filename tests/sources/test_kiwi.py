@@ -73,3 +73,28 @@ def test_kiwi_search_rejects_non_200(httpx_mock: HTTPXMock):
             date_from=date(2026, 6, 1), date_to=date(2026, 8, 31),
             nights_min=2, nights_max=7, limit=50,
         )
+
+
+def test_kiwi_retries_on_429(httpx_mock: HTTPXMock):
+    httpx_mock.add_response(status_code=429, text="throttled")
+    httpx_mock.add_response(status_code=429, text="throttled")
+    httpx_mock.add_response(status_code=200, json=_kiwi_response_json())
+    client = KiwiClient(api_key="test-key", backoff_seconds=0.0, max_retries=2)
+    fares = client.search(
+        origin="DUB", destination="BCN",
+        date_from=date(2026, 6, 1), date_to=date(2026, 8, 31),
+        nights_min=2, nights_max=7, limit=50,
+    )
+    assert len(fares) == 2
+
+
+def test_kiwi_gives_up_after_max_retries(httpx_mock: HTTPXMock):
+    for _ in range(3):
+        httpx_mock.add_response(status_code=429, text="throttled")
+    client = KiwiClient(api_key="test-key", backoff_seconds=0.0, max_retries=2)
+    with pytest.raises(KiwiError):
+        client.search(
+            origin="DUB", destination="BCN",
+            date_from=date(2026, 6, 1), date_to=date(2026, 8, 31),
+            nights_min=2, nights_max=7, limit=50,
+        )
