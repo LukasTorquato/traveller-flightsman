@@ -152,11 +152,16 @@ def run_scan(
     from datetime import date as _date
 
     t0 = time.monotonic()
+    started_at = datetime.now(UTC)
     today = today or _date.today()
     bundle = load_config(config_dir)
     api_key = os.environ.get(bundle.settings.kiwi_api_key_env_var, "")
     kiwi = KiwiClient(api_key=api_key, backoff_seconds=5.0, max_retries=2)
     ryanair = RyanairClient()
+
+    # Ensure parent directories exist for all output paths
+    for p in (history_path.parent, reports_dir, state_path.parent, email_output_path.parent):
+        p.mkdir(parents=True, exist_ok=True)
 
     # Build the per-run route list
     pool = bundle.destinations
@@ -196,6 +201,7 @@ def run_scan(
     outcomes: list[RouteOutcome] = []
     total_calls = 0
     errors: list[str] = []
+    delay_s = bundle.settings.kiwi_rate_limit_delay_ms / 1000.0
     for dest, cat, is_w in deduped:
         outcome, calls, errs = _scan_route(
             destination=dest,
@@ -210,6 +216,11 @@ def run_scan(
         outcomes.append(outcome)
         total_calls += calls
         errors.extend(errs)
+        if delay_s > 0:
+            time.sleep(delay_s)
+
+    # Save rotation state first to avoid duplicate observations on crash recovery.
+    save_rotation_state(new_rotation, state_path)
 
     # Persist observations (only for routes that actually returned a fare and were evaluated)
     for o in outcomes:
@@ -247,13 +258,12 @@ def run_scan(
         outcomes=outcomes,
         total_api_calls=total_calls,
     )
-    reports_dir.mkdir(parents=True, exist_ok=True)
     report_path = reports_dir / f"{today.isoformat()}.md"
     report_path.write_text(render_report(report), encoding="utf-8")
 
     meta = RunMetadata(
         run_date=today,
-        run_started_at=datetime.now(UTC).isoformat(),
+        run_started_at=started_at.isoformat(),
         run_ended_at=datetime.now(UTC).isoformat(),
         total_routes_queried=len([o for o in outcomes if not o.skipped]),
         total_api_calls=total_calls,
@@ -262,7 +272,6 @@ def run_scan(
         git_commit_sha=None,
     )
     append_run_metadata(meta, history_path)
-    save_rotation_state(new_rotation, state_path)
 
     # Email envelope — monthly health takes priority on first Tuesdays.
     # If health envelope is written, skip the deal envelope to avoid overwriting it.
