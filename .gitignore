@@ -9,3 +9,20 @@ build/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Type checkers
+.mypy_cache/
+.pyright/
+pyrightconfig.json
+
+# Coverage
+.coverage
+htmlcov/

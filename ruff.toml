@@ -3,4 +3,3 @@ target-version = "py312"
 
 [lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "TCH"]
-ignore = ["E501"]
