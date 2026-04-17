@@ -116,11 +116,7 @@ def test_orchestrator_happy_path_single_route(
     assert report.outcomes[0].destination_iata == "BCN"
     assert report.outcomes[0].flag is not None
     # JSONL written (1 observation + 1 run_metadata)
-    rows = (
-        (tmp_path / "history" / "observations.jsonl")
-        .read_text(encoding="utf-8")
-        .splitlines()
-    )
+    rows = (tmp_path / "history" / "observations.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(rows) == 2
     # Report written
     rpt = tmp_path / "reports" / "2026-04-21.md"
@@ -317,9 +313,7 @@ def test_orchestrator_first_tuesday_writes_health_email(
 
 
 @freeze_time("2026-04-21")
-def test_orchestrator_rotation_advances(
-    tmp_path: Path, httpx_mock: HTTPXMock, monkeypatch
-) -> None:
+def test_orchestrator_rotation_advances(tmp_path: Path, httpx_mock: HTTPXMock, monkeypatch) -> None:
     cfg = tmp_path / "config"
     cfg.mkdir()
     (cfg / "settings.json").write_text(

@@ -4,8 +4,11 @@ from traveller.models import DealFlag
 
 def _flag(is_deal: bool, phase: int, market_p15=None, baseline=None) -> DealFlag:
     return DealFlag(
-        is_deal=is_deal, phase=phase, reason="x",
-        market_p15_eur=market_p15, baseline_median_eur=baseline,
+        is_deal=is_deal,
+        phase=phase,
+        reason="x",
+        market_p15_eur=market_p15,
+        baseline_median_eur=baseline,
     )
 
 

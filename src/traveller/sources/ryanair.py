@@ -51,9 +51,7 @@ class RyanairClient:
         except httpx.HTTPError as exc:
             raise RyanairUnavailable(f"Ryanair network error: {exc}") from exc
         if resp.status_code != 200:
-            raise RyanairUnavailable(
-                f"Ryanair {resp.status_code}: {resp.text[:200]}"
-            )
+            raise RyanairUnavailable(f"Ryanair {resp.status_code}: {resp.text[:200]}")
         payload = resp.json()
         fares: list[Fare] = []
         for entry in payload.get("fares", []):

@@ -1,4 +1,5 @@
 """Convert observations.jsonl to an Excel workbook with two sheets."""
+
 from __future__ import annotations
 
 import json

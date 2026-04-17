@@ -21,7 +21,9 @@ def test_phase1_flags_when_best_below_p15_and_ceiling():
     # 20 fares ranging 40..78 — p15 is around the 15th percentile ~ 45
     fares = [_fare(40 + i * 2) for i in range(20)]
     result = evaluate_phase1(
-        fares=fares, percentile=15.0, ceiling=80.0,
+        fares=fares,
+        percentile=15.0,
+        ceiling=80.0,
     )
     assert result.is_deal is True
     assert result.market_p15_eur is not None
@@ -33,7 +35,9 @@ def test_phase1_no_flag_when_best_above_ceiling():
     # Best fare is 100, ceiling is 80 — no flag even if p15 fires
     fares = [_fare(100 + i) for i in range(20)]
     result = evaluate_phase1(
-        fares=fares, percentile=15.0, ceiling=80.0,
+        fares=fares,
+        percentile=15.0,
+        ceiling=80.0,
     )
     assert result.is_deal is False
 

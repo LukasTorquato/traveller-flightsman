@@ -6,9 +6,14 @@ from traveller.models import BaselineConfig, CategoryCeilings, Fare, PhaseThresh
 
 def _fare(price: float) -> Fare:
     return Fare(
-        price_eur=price, departure_date=date(2026, 6, 12),
-        return_date=date(2026, 6, 15), nights=3,
-        airline="FR", stops=0, source="kiwi", booking_url="x",
+        price_eur=price,
+        departure_date=date(2026, 6, 12),
+        return_date=date(2026, 6, 15),
+        nights=3,
+        airline="FR",
+        stops=0,
+        source="kiwi",
+        booking_url="x",
     )
 
 
@@ -24,17 +29,23 @@ def _baseline():
 
 def _ceilings():
     return CategoryCeilings(
-        europe_short_haul=80, europe_long_haul=130,
-        intercontinental_asia=550, intercontinental_south_america=600,
+        europe_short_haul=80,
+        europe_long_haul=130,
+        intercontinental_asia=550,
+        intercontinental_south_america=600,
     )
 
 
 def test_dispatcher_uses_phase1_when_no_history():
     fares = [_fare(40 + i * 2) for i in range(20)]
     result = evaluate_route(
-        fares=fares, observation_count=0, prior_prices=(),
-        category="europe_short_haul", is_wishlist=False,
-        baseline=_baseline(), ceilings=_ceilings(),
+        fares=fares,
+        observation_count=0,
+        prior_prices=(),
+        category="europe_short_haul",
+        is_wishlist=False,
+        baseline=_baseline(),
+        ceilings=_ceilings(),
         wishlist_multiplier=1.3,
     )
     assert result.phase == 1
@@ -44,9 +55,13 @@ def test_dispatcher_uses_phase2_with_medium_history():
     fares = [_fare(40) for _ in range(20)]
     prior = tuple(float(x) for x in range(80, 90))  # 10 priors, median ~84.5
     result = evaluate_route(
-        fares=fares, observation_count=10, prior_prices=prior,
-        category="europe_short_haul", is_wishlist=False,
-        baseline=_baseline(), ceilings=_ceilings(),
+        fares=fares,
+        observation_count=10,
+        prior_prices=prior,
+        category="europe_short_haul",
+        is_wishlist=False,
+        baseline=_baseline(),
+        ceilings=_ceilings(),
         wishlist_multiplier=1.3,
     )
     assert result.phase == 2
@@ -56,9 +71,13 @@ def test_dispatcher_uses_phase3_with_long_history():
     fares = [_fare(40) for _ in range(20)]
     prior = tuple(float(x) for x in range(80, 100))  # 20 priors
     result = evaluate_route(
-        fares=fares, observation_count=20, prior_prices=prior,
-        category="europe_short_haul", is_wishlist=False,
-        baseline=_baseline(), ceilings=_ceilings(),
+        fares=fares,
+        observation_count=20,
+        prior_prices=prior,
+        category="europe_short_haul",
+        is_wishlist=False,
+        baseline=_baseline(),
+        ceilings=_ceilings(),
         wishlist_multiplier=1.3,
     )
     assert result.phase == 3
@@ -66,9 +85,13 @@ def test_dispatcher_uses_phase3_with_long_history():
 
 def test_dispatcher_empty_fares_returns_no_deal():
     result = evaluate_route(
-        fares=[], observation_count=0, prior_prices=(),
-        category="europe_short_haul", is_wishlist=False,
-        baseline=_baseline(), ceilings=_ceilings(),
+        fares=[],
+        observation_count=0,
+        prior_prices=(),
+        category="europe_short_haul",
+        is_wishlist=False,
+        baseline=_baseline(),
+        ceilings=_ceilings(),
         wishlist_multiplier=1.3,
     )
     assert result.is_deal is False
@@ -81,9 +104,13 @@ def test_dispatcher_phase2_preserves_market_p15_from_phase1():
     fares = [_fare(40 + i * 2) for i in range(20)]  # 40, 42, ..., 78
     prior = tuple(float(x) for x in range(80, 90))  # 10 priors, median 84.5
     result = evaluate_route(
-        fares=fares, observation_count=10, prior_prices=prior,
-        category="europe_short_haul", is_wishlist=False,
-        baseline=_baseline(), ceilings=_ceilings(),
+        fares=fares,
+        observation_count=10,
+        prior_prices=prior,
+        category="europe_short_haul",
+        is_wishlist=False,
+        baseline=_baseline(),
+        ceilings=_ceilings(),
         wishlist_multiplier=1.3,
     )
     assert result.phase == 2
@@ -100,9 +127,13 @@ def test_dispatcher_phase3_requires_both_signals():
     fares = [_fare(40 + i) for i in range(20)]  # 40..59
     prior = tuple(float(x) for x in range(80, 100))
     result = evaluate_route(
-        fares=fares, observation_count=20, prior_prices=prior,
-        category="europe_short_haul", is_wishlist=False,
-        baseline=_baseline(), ceilings=_ceilings(),
+        fares=fares,
+        observation_count=20,
+        prior_prices=prior,
+        category="europe_short_haul",
+        is_wishlist=False,
+        baseline=_baseline(),
+        ceilings=_ceilings(),
         wishlist_multiplier=1.3,
     )
     assert result.phase == 3
@@ -118,17 +149,25 @@ def test_dispatcher_wishlist_uses_looser_threshold():
     prior = tuple([100.0] * 10)  # median 100
     # Without wishlist: 17% < 25% -> NO deal
     non_w = evaluate_route(
-        fares=fares, observation_count=10, prior_prices=prior,
-        category="europe_short_haul", is_wishlist=False,
-        baseline=_baseline(), ceilings=_ceilings(),
+        fares=fares,
+        observation_count=10,
+        prior_prices=prior,
+        category="europe_short_haul",
+        is_wishlist=False,
+        baseline=_baseline(),
+        ceilings=_ceilings(),
         wishlist_multiplier=1.3,
     )
     assert non_w.is_deal is False
     # With wishlist: 17% >= 15% -> IS a deal (and ceiling 80*1.3=104 > 83, passes)
     wish = evaluate_route(
-        fares=fares, observation_count=10, prior_prices=prior,
-        category="europe_short_haul", is_wishlist=True,
-        baseline=_baseline(), ceilings=_ceilings(),
+        fares=fares,
+        observation_count=10,
+        prior_prices=prior,
+        category="europe_short_haul",
+        is_wishlist=True,
+        baseline=_baseline(),
+        ceilings=_ceilings(),
         wishlist_multiplier=1.3,
     )
     assert wish.is_deal is True
@@ -136,11 +175,16 @@ def test_dispatcher_wishlist_uses_looser_threshold():
 
 def test_dispatcher_phase2_with_empty_prior_raises():
     import pytest
+
     fares = [_fare(40)]
     with pytest.raises(ValueError):
         evaluate_route(
-            fares=fares, observation_count=10, prior_prices=(),
-            category="europe_short_haul", is_wishlist=False,
-            baseline=_baseline(), ceilings=_ceilings(),
+            fares=fares,
+            observation_count=10,
+            prior_prices=(),
+            category="europe_short_haul",
+            is_wishlist=False,
+            baseline=_baseline(),
+            ceilings=_ceilings(),
             wishlist_multiplier=1.3,
         )

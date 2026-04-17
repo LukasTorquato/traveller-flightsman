@@ -58,6 +58,7 @@ def test_settings_rejects_nights_min_gt_max():
 
 def test_phase_thresholds_rejects_phase1_ge_phase2():
     from traveller.models import PhaseThresholds
+
     with pytest.raises(ValidationError):
         PhaseThresholds(phase1_max_obs=11, phase2_max_obs=3)
     with pytest.raises(ValidationError):
@@ -89,14 +90,26 @@ def test_observation_is_frozen():
     from datetime import date
 
     from traveller.models import Observation
+
     obs = Observation(
-        run_date=date(2026, 4, 21), origin="DUB",
-        destination_iata="BCN", destination_city="Barcelona",
-        departure_date=date(2026, 6, 12), return_date=date(2026, 6, 15),
-        nights=3, price_eur=48.5, airline="FR", stops=0, source="kiwi",
-        is_wishlist=False, category="europe_short_haul",
-        market_p15_eur=62.0, was_flagged_as_deal=True,
-        flag_reason="x", baseline_median_eur=None, phase=1,
+        run_date=date(2026, 4, 21),
+        origin="DUB",
+        destination_iata="BCN",
+        destination_city="Barcelona",
+        departure_date=date(2026, 6, 12),
+        return_date=date(2026, 6, 15),
+        nights=3,
+        price_eur=48.5,
+        airline="FR",
+        stops=0,
+        source="kiwi",
+        is_wishlist=False,
+        category="europe_short_haul",
+        market_p15_eur=62.0,
+        was_flagged_as_deal=True,
+        flag_reason="x",
+        baseline_median_eur=None,
+        phase=1,
     )
     with pytest.raises(ValidationError):
         obs.price_eur = 99.9

@@ -30,14 +30,18 @@ def evaluate_route(
         thresholds=baseline.phase_thresholds,
     )
     ceiling = ceiling_for(
-        category, ceilings,
-        is_wishlist=is_wishlist, multiplier=wishlist_multiplier,
+        category,
+        ceilings,
+        is_wishlist=is_wishlist,
+        multiplier=wishlist_multiplier,
     )
     if not fares:
         return DealFlag(
-            is_deal=False, phase=phase,
+            is_deal=False,
+            phase=phase,
             reason="no fares returned",
-            market_p15_eur=None, baseline_median_eur=None,
+            market_p15_eur=None,
+            baseline_median_eur=None,
         )
     p1 = evaluate_phase1(
         fares=fares,
@@ -54,7 +58,9 @@ def evaluate_route(
         )
     median = statistics.median(prior_prices)
     p2 = evaluate_phase2(
-        best_price=best, baseline_median=median, ceiling=ceiling,
+        best_price=best,
+        baseline_median=median,
+        ceiling=ceiling,
         is_wishlist=is_wishlist,
         min_discount_pct_non_wishlist=baseline.phase2_min_discount_pct_non_wishlist,
         min_discount_pct_wishlist=baseline.phase2_min_discount_pct_wishlist,
@@ -62,7 +68,9 @@ def evaluate_route(
     if phase == 2:
         # Preserve market p15 for observation record
         return DealFlag(
-            is_deal=p2.is_deal, phase=2, reason=p2.reason,
+            is_deal=p2.is_deal,
+            phase=2,
+            reason=p2.reason,
             market_p15_eur=p1.market_p15_eur,
             baseline_median_eur=p2.baseline_median_eur,
         )

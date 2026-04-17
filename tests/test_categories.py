@@ -3,18 +3,22 @@ from traveller.models import CategoryCeilings, DestinationPool
 
 
 def _pool():
-    return DestinationPool.model_validate({
-        "europe_short_haul": [{"iata": "BCN", "city": "Barcelona"}],
-        "europe_long_haul": [{"iata": "ATH", "city": "Athens"}],
-        "intercontinental_asia": [{"iata": "BKK", "city": "Bangkok"}],
-        "intercontinental_south_america": [{"iata": "GRU", "city": "Sao Paulo"}],
-    })
+    return DestinationPool.model_validate(
+        {
+            "europe_short_haul": [{"iata": "BCN", "city": "Barcelona"}],
+            "europe_long_haul": [{"iata": "ATH", "city": "Athens"}],
+            "intercontinental_asia": [{"iata": "BKK", "city": "Bangkok"}],
+            "intercontinental_south_america": [{"iata": "GRU", "city": "Sao Paulo"}],
+        }
+    )
 
 
 def _ceilings():
     return CategoryCeilings(
-        europe_short_haul=80, europe_long_haul=130,
-        intercontinental_asia=550, intercontinental_south_america=600,
+        europe_short_haul=80,
+        europe_long_haul=130,
+        intercontinental_asia=550,
+        intercontinental_south_america=600,
     )
 
 
@@ -28,6 +32,7 @@ def test_category_for_iata_matches_pool():
 
 def test_category_for_iata_missing_raises():
     import pytest
+
     pool = _pool()
     with pytest.raises(KeyError):
         category_for_iata("ZZZ", pool)

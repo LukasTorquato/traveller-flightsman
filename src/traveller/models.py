@@ -104,6 +104,7 @@ class Wishlist(BaseModel):
 
 class Fare(BaseModel):
     """A single returned fare from a data source."""
+
     model_config = ConfigDict(extra="forbid", frozen=True)
     price_eur: float
     departure_date: date
@@ -117,6 +118,7 @@ class Fare(BaseModel):
 
 class Observation(BaseModel):
     """A single row in observations.jsonl."""
+
     model_config = ConfigDict(extra="forbid", frozen=True)
     run_date: date
     origin: str
@@ -140,6 +142,7 @@ class Observation(BaseModel):
 
 class RunMetadata(BaseModel):
     """One-per-run row distinguishable from observation rows."""
+
     model_config = ConfigDict(extra="forbid", frozen=True)
     kind: Literal["run_metadata"] = "run_metadata"
     run_date: date
@@ -154,6 +157,7 @@ class RunMetadata(BaseModel):
 
 class DealFlag(BaseModel):
     """Result of evaluating a single fare against deal logic."""
+
     model_config = ConfigDict(extra="forbid", frozen=True)
     is_deal: bool
     phase: Literal[1, 2, 3]
