@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date  # noqa: TC003 - needed at runtime by pydantic
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Category = Literal[
     "europe_short_haul",
@@ -14,7 +14,7 @@ Category = Literal[
 
 
 class SearchWindow(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
     days_ahead_max: int = Field(gt=0, le=365)
     nights_min: int = Field(ge=1)
     nights_max: int = Field(ge=1)
@@ -27,7 +27,7 @@ class SearchWindow(BaseModel):
 
 
 class CategoryCeilings(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
     europe_short_haul: float = Field(gt=0)
     europe_long_haul: float = Field(gt=0)
     intercontinental_asia: float = Field(gt=0)
@@ -35,14 +35,20 @@ class CategoryCeilings(BaseModel):
 
 
 class PhaseThresholds(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
     phase1_max_obs: int = Field(ge=0)
     phase2_max_obs: int = Field(ge=0)
 
+    @model_validator(mode="after")
+    def _check_order(self) -> PhaseThresholds:
+        if self.phase1_max_obs >= self.phase2_max_obs:
+            raise ValueError("phase1_max_obs must be < phase2_max_obs")
+        return self
+
 
 class BaselineConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    cold_start_p_percentile: float = Field(gt=0, lt=100)
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    cold_start_p_percentile: float = Field(ge=1, le=50)
     baseline_window_observations: int = Field(gt=0)
     phase2_min_discount_pct_non_wishlist: float = Field(ge=0, le=100)
     phase2_min_discount_pct_wishlist: float = Field(ge=0, le=100)
@@ -50,7 +56,7 @@ class BaselineConfig(BaseModel):
 
 
 class Settings(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
     origin_iata: str = Field(min_length=3, max_length=3)
     currency: str = Field(min_length=3, max_length=3)
     email_recipient: str
@@ -59,17 +65,24 @@ class Settings(BaseModel):
     wishlist_ceiling_multiplier: float = Field(gt=1.0)
     baseline: BaselineConfig
     kiwi_api_key_env_var: str
-    kiwi_rate_limit_delay_ms: int = Field(ge=0)
+    kiwi_rate_limit_delay_ms: int = Field(ge=0, le=60_000)
+
+    @field_validator("email_recipient")
+    @classmethod
+    def _validate_email(cls, v: str) -> str:
+        if "@" not in v or "." not in v.split("@")[-1]:
+            raise ValueError("email_recipient must look like an email address")
+        return v
 
 
 class Destination(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
     iata: str = Field(min_length=3, max_length=3)
     city: str
 
 
 class DestinationPool(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
     europe_short_haul: list[Destination]
     europe_long_haul: list[Destination]
     intercontinental_asia: list[Destination]
@@ -77,7 +90,7 @@ class DestinationPool(BaseModel):
 
 
 class WishlistEntry(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
     iata: str = Field(min_length=3, max_length=3)
     city: str
     category: Category
@@ -85,13 +98,13 @@ class WishlistEntry(BaseModel):
 
 
 class Wishlist(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
     wishlist: list[WishlistEntry]
 
 
 class Fare(BaseModel):
     """A single returned fare from a data source."""
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
     price_eur: float
     departure_date: date
     return_date: date
@@ -104,7 +117,7 @@ class Fare(BaseModel):
 
 class Observation(BaseModel):
     """A single row in observations.jsonl."""
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
     run_date: date
     origin: str
     destination_iata: str
@@ -127,7 +140,7 @@ class Observation(BaseModel):
 
 class RunMetadata(BaseModel):
     """One-per-run row distinguishable from observation rows."""
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
     kind: Literal["run_metadata"] = "run_metadata"
     run_date: date
     run_started_at: str
@@ -141,7 +154,7 @@ class RunMetadata(BaseModel):
 
 class DealFlag(BaseModel):
     """Result of evaluating a single fare against deal logic."""
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
     is_deal: bool
     phase: Literal[1, 2, 3]
     reason: str
