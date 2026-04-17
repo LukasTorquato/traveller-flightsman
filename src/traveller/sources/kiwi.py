@@ -94,7 +94,13 @@ class KiwiClient:
             except httpx.HTTPError as exc:
                 raise KiwiError(f"Kiwi network error: {exc}") from exc
             if resp.status_code == 200:
-                return [_parse_fare(e) for e in resp.json().get("data", [])]
+                fares: list[Fare] = []
+                for entry in resp.json().get("data", []):
+                    try:
+                        fares.append(_parse_fare(entry))
+                    except (KiwiError, KeyError, ValueError):
+                        continue
+                return fares
             last_status, last_text = resp.status_code, resp.text[:200]
             if resp.status_code == 429 and attempt < attempts - 1:
                 time.sleep(self._backoff_seconds)

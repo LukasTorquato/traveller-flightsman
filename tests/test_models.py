@@ -86,6 +86,13 @@ def test_settings_rejects_percentile_out_of_range():
         Settings.model_validate(d)
 
 
+def test_settings_rejects_missing_search_window_key():
+    d = _valid_settings_dict()
+    del d["search_windows"]["intercontinental"]
+    with pytest.raises(ValidationError):
+        Settings.model_validate(d)
+
+
 def test_observation_is_frozen():
     from datetime import date
 

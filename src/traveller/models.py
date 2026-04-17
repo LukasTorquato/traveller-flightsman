@@ -74,6 +74,14 @@ class Settings(BaseModel):
             raise ValueError("email_recipient must look like an email address")
         return v
 
+    @model_validator(mode="after")
+    def _check_search_windows_keys(self) -> Settings:
+        required = {"europe_short_haul", "europe_long_haul", "intercontinental"}
+        missing = required - set(self.search_windows.keys())
+        if missing:
+            raise ValueError(f"search_windows missing required keys: {sorted(missing)}")
+        return self
+
 
 class Destination(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)

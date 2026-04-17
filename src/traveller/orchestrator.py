@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
+import sys
 import time
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
 from traveller.config import load_config
 from traveller.emailer import write_email_envelope
@@ -149,14 +151,26 @@ def run_scan(
     email_output_path: Path,
     today: date | None = None,
 ) -> tuple[RunReport, Path]:
-    from datetime import date as _date
-
     t0 = time.monotonic()
     started_at = datetime.now(UTC)
-    today = today or _date.today()
+    today = today or datetime.now(ZoneInfo("Europe/Dublin")).date()
     bundle = load_config(config_dir)
     api_key = os.environ.get(bundle.settings.kiwi_api_key_env_var, "")
-    kiwi = KiwiClient(api_key=api_key, backoff_seconds=5.0, max_retries=2)
+    try:
+        kiwi = KiwiClient(api_key=api_key, backoff_seconds=5.0, max_retries=2)
+    except KiwiError as exc:
+        print(
+            f"FATAL: KiwiError at startup: {exc}. "
+            f"Check {bundle.settings.kiwi_api_key_env_var} env var.",
+            file=sys.stderr,
+        )
+        # Write a minimal empty email envelope so the caller sees valid structure
+        email_output_path.parent.mkdir(parents=True, exist_ok=True)
+        email_output_path.write_text(
+            '{"should_send": false, "to": "", "subject": "", "body_html": ""}',
+            encoding="utf-8",
+        )
+        raise
     ryanair = RyanairClient()
 
     # Ensure parent directories exist for all output paths

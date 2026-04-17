@@ -409,3 +409,79 @@ def test_orchestrator_rotation_advances(tmp_path: Path, httpx_mock: HTTPXMock, m
     state = json.loads((tmp_path / "state" / "rotation.json").read_text())
     assert state["asia_cursor"] == 3
     assert state["south_america_cursor"] == 2
+
+
+@freeze_time("2026-04-21")
+def test_orchestrator_missing_kiwi_key_raises_kiwi_error(tmp_path: Path, monkeypatch):
+    from traveller.sources.kiwi import KiwiError
+
+    cfg = tmp_path / "config"
+    cfg.mkdir()
+    (cfg / "settings.json").write_text(
+        json.dumps(
+            {
+                "origin_iata": "DUB",
+                "currency": "EUR",
+                "email_recipient": "l@example.com",
+                "search_windows": {
+                    "europe_short_haul": {
+                        "days_ahead_max": 90,
+                        "nights_min": 2,
+                        "nights_max": 7,
+                    },
+                    "europe_long_haul": {
+                        "days_ahead_max": 120,
+                        "nights_min": 2,
+                        "nights_max": 7,
+                    },
+                    "intercontinental": {
+                        "days_ahead_max": 240,
+                        "nights_min": 10,
+                        "nights_max": 21,
+                    },
+                },
+                "category_ceilings_eur": {
+                    "europe_short_haul": 80,
+                    "europe_long_haul": 130,
+                    "intercontinental_asia": 550,
+                    "intercontinental_south_america": 600,
+                },
+                "wishlist_ceiling_multiplier": 1.3,
+                "baseline": {
+                    "cold_start_p_percentile": 15,
+                    "baseline_window_observations": 12,
+                    "phase2_min_discount_pct_non_wishlist": 25,
+                    "phase2_min_discount_pct_wishlist": 15,
+                    "phase_thresholds": {"phase1_max_obs": 3, "phase2_max_obs": 11},
+                },
+                "kiwi_api_key_env_var": "KIWI_TEQUILA_API_KEY",
+                "kiwi_rate_limit_delay_ms": 0,
+            }
+        )
+    )
+    (cfg / "destinations.json").write_text(
+        json.dumps(
+            {
+                "europe_short_haul": [{"iata": "BCN", "city": "Barcelona"}],
+                "europe_long_haul": [],
+                "intercontinental_asia": [],
+                "intercontinental_south_america": [],
+            }
+        )
+    )
+    (cfg / "wishlist.json").write_text(json.dumps({"wishlist": []}))
+
+    monkeypatch.delenv("KIWI_TEQUILA_API_KEY", raising=False)
+    import pytest
+
+    with pytest.raises(KiwiError):
+        run_scan(
+            config_dir=cfg,
+            history_path=tmp_path / "history" / "observations.jsonl",
+            reports_dir=tmp_path / "reports",
+            state_path=tmp_path / "state" / "rotation.json",
+            email_output_path=tmp_path / "output" / "email.json",
+        )
+    # Minimal envelope written before raise
+    env = json.loads((tmp_path / "output" / "email.json").read_text(encoding="utf-8"))
+    assert env["should_send"] is False
