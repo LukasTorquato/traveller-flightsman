@@ -33,6 +33,12 @@ def evaluate_route(
         category, ceilings,
         is_wishlist=is_wishlist, multiplier=wishlist_multiplier,
     )
+    if not fares:
+        return DealFlag(
+            is_deal=False, phase=phase,
+            reason="no fares returned",
+            market_p15_eur=None, baseline_median_eur=None,
+        )
     p1 = evaluate_phase1(
         fares=fares,
         percentile=baseline.cold_start_p_percentile,
@@ -40,14 +46,13 @@ def evaluate_route(
     )
     if phase == 1:
         return p1
-    if not fares:
-        return DealFlag(
-            is_deal=False, phase=phase,
-            reason="no fares returned",
-            market_p15_eur=p1.market_p15_eur, baseline_median_eur=None,
-        )
     best = min(f.price_eur for f in fares)
-    median = statistics.median(prior_prices) if prior_prices else 0.0
+    if not prior_prices:
+        raise ValueError(
+            f"Phase {phase} selected but prior_prices is empty; "
+            "orchestrator must supply history consistent with observation_count"
+        )
+    median = statistics.median(prior_prices)
     p2 = evaluate_phase2(
         best_price=best, baseline_median=median, ceiling=ceiling,
         is_wishlist=is_wishlist,
