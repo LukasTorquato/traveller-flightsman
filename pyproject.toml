@@ -1,29 +1,13 @@
 [project]
 name = "traveller"
-version = "0.1.0"
-description = "Weekly round-trip flight-deal scanner from Dublin"
+version = "0.2.0"
+description = "Weekly flight-deal scanner — prompt-driven Claude Code routine"
 requires-python = ">=3.12"
-dependencies = [
-    "httpx>=0.27",
-    "pydantic>=2.6",
-    "tzdata>=2024.1; sys_platform == 'win32'",
-]
+# No runtime dependencies — traveller_math.py uses only stdlib.
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=8.0",
-    "pytest-httpx>=0.36",
-    "freezegun>=1.4",
-    "ruff>=0.4",
-    "openpyxl>=3.1",
-]
+dev = ["pytest>=8.0"]
 
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[project.scripts]
-traveller = "traveller.cli:main"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
