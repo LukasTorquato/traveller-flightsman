@@ -1,5 +1,7 @@
 # Traveller — Weekly Round-Trip Deal Scanner
 
+> **Historical — superseded 2026-04-18.** The Kiwi Tequila API became inaccessible and the implementation pivoted to a prompt-driven Claude Code routine. See `prompts/weekly-scan.md` and `README.md` for the current architecture. This spec is preserved for context on the original design thinking.
+
 **Design spec**
 **Date:** 2026-04-16
 **Status:** Approved for planning

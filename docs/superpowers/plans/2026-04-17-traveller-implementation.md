@@ -1,5 +1,7 @@
 # Traveller Implementation Plan
 
+> **Historical — superseded 2026-04-18.** See `prompts/weekly-scan.md`. Tasks 0-25 were completed against the original design but the Kiwi-based Python architecture was replaced with Claude Code + a small math helper. This plan is preserved as a record of the TDD build that happened.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a weekly scheduled routine that scans round-trip flight deals from Dublin (DUB) across Europe and select intercontinental destinations, flags only great deals via email, and records every observation in a JSONL history for progressively smarter future detection.
