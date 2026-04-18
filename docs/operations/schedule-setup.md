@@ -1,40 +1,39 @@
-# Scheduled-task setup
+# Running the weekly scan in Claude Code
 
-One-time setup for the Tuesday 08:00 Dublin-time run.
+This routine runs inside Claude Code — no external cron, no remote scheduled agent.
 
-## Prerequisites
-- Project repo pushed to GitHub (private or public)
-- `KIWI_TEQUILA_API_KEY` available to the scheduled environment (via secrets)
-- Gmail MCP connected to the account that should send the email
-- `scheduled-tasks` MCP available in the Claude Code / Cowork environment
+## One-time setup
 
-## Registering the task
+1. Clone this repo to your machine.
+2. Ensure Python 3.12+ is on PATH (the math helper needs it).
+3. Install dev deps if you plan to run tests: `pip install -e ".[dev]"`.
+4. Populate `config/wishlist.json` with your real dream destinations.
+5. Connect the Gmail MCP to your account inside Claude Code (one-time OAuth).
+6. Make sure this repo has a remote configured (`git remote -v`) if you want commits pushed automatically.
 
-From a Claude Code session in this repo, run:
+## Manual weekly invocation (recommended)
 
-"Use the scheduled-tasks MCP (`mcp__scheduled-tasks__create_scheduled_task`) to create a weekly task with:
-- **Name:** `traveller-weekly-scan`
-- **Cron:** `0 7 * * 2`   (Tuesday 07:00 UTC = 08:00 Dublin during BST, 07:00 during GMT — see note)
-- **Prompt:** the full contents of `prompts/weekly-scan.md`
-- **Working directory:** this repo"
+Every Tuesday (or whenever you want to scan), open this repo in Claude Code and run:
 
-### Timezone note
-Ireland observes BST (UTC+1) from late March through late October, and GMT (UTC+0) the rest of the year. The cron above fires at **07:00 UTC** year-round, which is:
-- **08:00 Dublin during BST** ✓
-- **07:00 Dublin during GMT** (one hour earlier than target — acceptable for a weekly flight-deal scan)
+    /weekly-scan
 
-If precise 08:00 Dublin year-round is required, use a timezone-aware cron (e.g. `0 8 * * 2 Europe/Dublin`) if the scheduled-tasks MCP supports it.
+Claude follows `prompts/weekly-scan.md` end-to-end. The whole scan takes ~5–10 minutes with web searches.
 
-## Verifying
-After creation, use `mcp__scheduled-tasks__list_scheduled_tasks` to confirm `traveller-weekly-scan` is registered and shows a next-fire time in the future.
+## Automated invocation via /loop (optional)
 
-## Manually triggering a dry run
-Run locally first to confirm everything works:
+If you want it to run automatically on a weekly cadence, you can use Claude Code's `/loop` feature:
 
-```bash
-export KIWI_TEQUILA_API_KEY=your_key
-python -m traveller run
-cat output/email.json
-```
+    /loop 7d /weekly-scan
 
-Then pass the Tuesday prompt through Claude once as a manual rehearsal before the first real Tuesday.
+(or set a cron equivalent via the scheduled-tasks MCP if you prefer)
+
+## Verifying each run
+
+- `git log --oneline` should show a new `chore(traveller): weekly scan ...` commit.
+- `reports/YYYY-MM-DD.md` should exist for every run.
+- `history/observations.jsonl` should grow by one `run_metadata` row per run.
+- Your inbox should have an email if deals were found, or no email if none.
+
+## Silent-failure check
+
+On the 1st Tuesday of each month, you'll get a `📊 Travel scan monthly health` email. If that email doesn't arrive, the routine has likely broken — check the git log for the last run date.
