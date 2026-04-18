@@ -1,57 +1,48 @@
 # Traveller
 
-Weekly round-trip flight-deal scanner. Runs Tuesdays at 08:00 Dublin time as a scheduled Claude agent, emails only when it finds a great deal.
-
-See [the design spec](docs/superpowers/specs/2026-04-16-traveller-design.md) for the full rationale.
+Weekly round-trip flight-deal scanner for Dublin. Runs inside **Claude Code** as a slash-command routine — no servers, no API keys, just the prompt at `prompts/weekly-scan.md`.
 
 ## What it does
 
-Every Tuesday:
-1. Queries Kiwi Tequila + Ryanair for round-trip fares from DUB to ~35 destinations
-2. Evaluates each result against a tiered deal logic (Phase 1 cold-start → Phase 2 baseline → Phase 3 hybrid)
+Every Tuesday (or when you invoke `/weekly-scan`):
+
+1. Claude Code searches the web for cheap round-trip fares from DUB to ~30 destinations (Europe + rotating intercontinental picks)
+2. Compares each route against a tiered evaluator (Phase 1 cold-start → Phase 2 baseline → Phase 3 hybrid)
 3. Appends observations to `history/observations.jsonl`
-4. Writes `reports/YYYY-MM-DD.md`
+4. Writes a dated markdown report
 5. Emails you only if a great deal was found
-6. Commits and pushes the new history + report
-7. On the first Tuesday of each month, sends a terse "I'm alive" health email regardless of deals
+6. Commits the new history + report
 
-## Development
+The prompt (`prompts/weekly-scan.md`) is the source of truth. Claude drives everything; `traveller_math.py` is a stdlib-only calculator Claude calls when it wants to verify its own arithmetic.
 
-```bash
-python -m venv .venv
-source .venv/Scripts/activate  # Windows
-pip install -e ".[dev]"
-pytest -v
-```
+## Quick start
 
-## Local dry run
+1. Read and edit `config/wishlist.json` to add real destinations.
+2. Make sure Gmail MCP is connected in Claude Code.
+3. Open the repo in Claude Code and run `/weekly-scan`.
 
-```bash
-export KIWI_TEQUILA_API_KEY=your_kiwi_key
-python -m traveller run
-cat output/email.json
-```
+See `docs/operations/schedule-setup.md` for full setup.
 
-## Configuration
+## Project layout
 
-- `config/settings.json` — thresholds, ceilings, windows
-- `config/destinations.json` — curated Europe + intercontinental pool
-- `config/wishlist.json` — "track harder" list (edit to add dream destinations)
+- `prompts/weekly-scan.md` — the runbook Claude follows (THE product)
+- `.claude/commands/weekly-scan.md` — slash-command entry point
+- `config/` — destinations, wishlist, thresholds
+- `traveller_math.py` — validation calculator (percentile / median / evaluate)
+- `tests/test_traveller_math.py` — tests for the calculator
+- `history/observations.jsonl` — append-only scan history
+- `reports/YYYY-MM-DD.md` — per-run markdown reports
+- `state/rotation.json` — intercontinental rotation cursor
+- `docs/superpowers/specs/` — original design doc (historical)
+- `docs/superpowers/plans/` — original implementation plan (historical)
 
-Edit these directly. Every run re-reads them.
+## Running the math helper standalone
 
-## Scheduled run
+    python traveller_math.py percentile 15 40,50,60,70,80
+    python traveller_math.py median 40,50,60,70
+    python traveller_math.py evaluate input.json
 
-See [docs/operations/schedule-setup.md](docs/operations/schedule-setup.md).
+## Running the tests
 
-## History → Excel (optional)
-
-```bash
-python scripts/jsonl_to_xlsx.py history/observations.jsonl history.xlsx
-```
-
-## When to look at the data
-
-- Weekly deal emails are auto-generated — act on them if you want to travel
-- Monthly health email (1st Tuesday): confirms the routine is alive
-- If you don't get a health email on the expected day, the routine has broken — check `history/observations.jsonl` via `git log`
+    pip install -e ".[dev]"
+    pytest
