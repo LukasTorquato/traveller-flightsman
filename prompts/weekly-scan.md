@@ -1,8 +1,8 @@
 # Traveller Weekly Scan
 
-You are running the weekly trip-deal scan for Lukas, based in Dublin (DUB).
+You are running the weekly trip-deal scan for the repo owner, based at `<TRAVELLER_ORIGIN_IATA>` in `<TRAVELLER_TIMEZONE>`.
 
-Today is Tuesday (or user-triggered). Your goal: find great deals on round-trip **trips** (flight + accommodation, compared against bundled packages) from DUB, flag only the interesting ones, and email Lukas if any. Stay silent if none.
+Today is Tuesday (or user-triggered). Your goal: find great deals on round-trip **trips** (flight + accommodation, compared against bundled packages) from `<TRAVELLER_ORIGIN_IATA>`, flag only the interesting ones, and email the recipient if any. Stay silent if none.
 
 This prompt is self-contained. Follow every step in order. The working directory is the repo root.
 
@@ -34,32 +34,40 @@ Scope filters which category groups contribute to the scan list in step 3. Every
 Before doing anything else, check all of the following. If any fails, STOP and email a failure notice via Gmail MCP (subject: `⚠️ Travel scan FAILED — <short reason>`).
 
 - Working directory is the traveller project repo root (has `prompts/weekly-scan.md` and `traveller_math.py`).
+- `.env` exists at repo root and contains `TRAVELLER_EMAIL`, `TRAVELLER_ORIGIN_IATA`, `TRAVELLER_CURRENCY`, `TRAVELLER_TIMEZONE`, `TRAVELLER_NAME`. If missing, STOP and instruct the user to copy `.env.example` to `.env` and fill it in.
 - `config/settings.json`, `config/destinations.json`, `config/wishlist.json` all exist and parse as valid JSON.
 - `config/settings.json` contains v2 keys: `trip_profiles`, `category_cost_caps_eur`, `departure_day_preference`, `hotel_quality_floor`, `hotel_sampling`, `airbnb_quality_floor`, `airbnb_enabled_categories`, `airbnb_sampling`, `bundled_sites`.
 - `git status` is clean (no uncommitted changes before we start).
 - `python traveller_math.py percentile 15 40,50,60` prints a number (~43.0). Script is runnable.
 - The Gmail MCP is connected in this Claude Code session.
 
-Note: `KIWI_TEQUILA_API_KEY` is **not** required. Web search is the data source now.
 
 ---
 
 ## 1. Load configuration
 
-Read all three config JSONs into working memory:
+Read `.env` using the Read tool. Parse each non-empty, non-comment line as `KEY=VALUE` (strip whitespace around `=`; ignore lines starting with `#` and blank lines). Store the values for use downstream:
 
-- `config/settings.json` — v2 shape. Must contain at minimum: `origin_iata`, `currency`, `email_recipient`, `trip_profiles`, `category_cost_caps_eur`, `wishlist_ceiling_multiplier`, `departure_day_preference`, `hotel_quality_floor`, `hotel_sampling`, `airbnb_quality_floor`, `airbnb_enabled_categories`, `airbnb_sampling`, `bundled_sites`, `baseline`.
+  - `TRAVELLER_EMAIL` → email recipient
+  - `TRAVELLER_ORIGIN_IATA` → origin airport code
+  - `TRAVELLER_CURRENCY` → currency code
+  - `TRAVELLER_TIMEZONE` → IANA timezone for "today" and first-Tuesday checks
+  - `TRAVELLER_NAME` → greeting name (default `"traveller"` if empty or blank)
+
+Then read all three config JSONs into working memory (project-wide defaults — no user-specific values live here anymore):
+
+- `config/settings.json` — v2 shape. Must contain at minimum: `trip_profiles`, `category_cost_caps_eur`, `wishlist_ceiling_multiplier`, `departure_day_preference`, `hotel_quality_floor`, `hotel_sampling`, `airbnb_quality_floor`, `airbnb_enabled_categories`, `airbnb_sampling`, `bundled_sites`, `baseline`.
 - `config/destinations.json` — groups: `europe_short_haul`, `europe_long_haul`, `intercontinental_asia`, `intercontinental_south_america`. Each group is a list of `{iata, city, category}` entries.
 - `config/wishlist.json` — an array of `{iata, city, category}` entries. Always scanned (within scope), gets the looser wishlist thresholds.
 
-If any required key is missing, STOP and email a failure notice (subject: `⚠️ Travel scan FAILED — config invalid`).
+If any required key is missing (from `.env` or `config/settings.json`), STOP and email a failure notice (subject: `⚠️ Travel scan FAILED — config invalid`).
 
 ---
 
-## 2. Determine Dublin-local date and first-Tuesday check
+## 2. Determine local date and first-Tuesday check
 
-- Use Bash `TZ=Europe/Dublin date +%Y-%m-%d` for the run date.
-- Use `TZ=Europe/Dublin date +%u` for day of week (`2` = Tuesday).
+- Use Bash `TZ=<TRAVELLER_TIMEZONE> date +%Y-%m-%d` for the run date (substitute the value read from `.env`; e.g. `TZ=Europe/Dublin`).
+- Use `TZ=<TRAVELLER_TIMEZONE> date +%u` for day of week (`2` = Tuesday).
 - First Tuesday of the month = day of month is in `[1..7]` AND weekday is Tuesday.
 - Store: `run_date`, `is_first_tuesday` (bool). The health email is due when `is_first_tuesday` is true regardless of deal outcomes.
 
@@ -141,7 +149,7 @@ Currently enabled: `europe_long_haul`, `intercontinental_asia`. Skip for `europe
 
 ### 4c. Packages (always, except for 0-night variants)
 
-For each of the top 5 flight date-pairs, query **all 10 `settings.bundled_sites`** for "DUB → destination, dates X → Y, 2 adults":
+For each of the top 5 flight date-pairs, query **all 10 `settings.bundled_sites`** for "`<TRAVELLER_ORIGIN_IATA>` → destination, dates X → Y, 2 adults":
 
 - Record cheapest total per site (normalised per-room, 2 adults).
 - Unreachable sites (CAPTCHA / 403 / rate-limited) → log once and treat as "not offered". No retries.
@@ -268,7 +276,7 @@ Do this especially for wishlist routes or any surprising deal. If a verdict look
 
 For each route that got a non-skipped verdict, append **one** JSONL row — the best date-pair (the one whose total matches `best_combined_eur`). Pull the winning detail from `fare_details`.
 
-v2 schema (newline-separated, one per route):
+v2 schema (newline-separated, one per route — example uses `DUB`/EUR field names; substitute `origin` with your `TRAVELLER_ORIGIN_IATA`, and note the `_eur` suffixes are historical schema identifiers — values are always in `TRAVELLER_CURRENCY`):
 
 ```json
 {"schema": "v2", "run_date": "...", "origin": "DUB", "destination_iata": "ATH", "destination_city": "Athens", "category": "europe_long_haul", "is_wishlist": false, "trip_profile": "europe_long_haul_5_nights", "nights": 5, "departure_date": "2026-06-12", "return_date": "2026-06-17", "flight_price_eur": 110.0, "flight_airline": "Aegean", "flight_stops": 0, "flight_booking_url": "...", "hotel_price_per_night_eur": 85.0, "hotel_sample_size": 9, "hotel_rating_min": 7.8, "hotel_example_name": "...", "hotel_example_booking_url": "...", "airbnb_price_per_night_eur": 62.0, "airbnb_sample_size": 7, "airbnb_rating_min": 4.7, "airbnb_example_name": "...", "airbnb_example_booking_url": "...", "accommodation_source": "airbnb", "accommodation_price_per_night_eur": 62.0, "diy_total_eur": 420.0, "package_cheapest_eur": 510.0, "package_cheapest_site": "loveholidays", "package_cheapest_url": "...", "best_total_eur": 420.0, "best_source": "diy_airbnb", "combined_ceiling_eur": 590.0, "market_p15_combined_eur": 480.0, "baseline_median_combined_eur": null, "was_flagged_as_deal": true, "flag_reason": "best_total 420 ≤ 0.85×p15 (408), Airbnb 27% cheaper than hotel", "phase": 1}
@@ -299,7 +307,7 @@ Write `reports/<run_date>.md`. Template:
 ```markdown
 # Travel Deals Scan — <run_date> (<weekday>)
 
-**Origin:** DUB  **Currency:** EUR  **Scope:** <scope>
+**Origin:** <TRAVELLER_ORIGIN_IATA>  **Currency:** <TRAVELLER_CURRENCY>  **Scope:** <scope>
 
 ## Great deals this week
 
@@ -377,7 +385,8 @@ For each route where `is_deal == true`, build a **reason** using this extended l
 
 ## 12. Compose the email
 
-- **Subject:** `✈️ N travel deals this week — <top-deal-city> €<total> <reason-tag>` where `<reason-tag>` is a short marker like "all-time low", "package wins", "Airbnb wins", "seasonal", or "-30% vs baseline". If N=0, no email (unless it's a monthly health email day).
+- **Subject:** `✈️ N travel deals this week — <top-deal-city> <TRAVELLER_CURRENCY><total> <reason-tag>` where `<reason-tag>` is a short marker like "all-time low", "package wins", "Airbnb wins", "seasonal", or "-30% vs baseline". If N=0, no email (unless it's a monthly health email day).
+- **Greeting:** open the body with `Hi <TRAVELLER_NAME>,` (substitute the value from `.env`; if empty or blank, use `Hi there,`).
 - **Body:** one block per deal. Each block MUST contain:
   - City + IATA
   - Best total, dates, nights
@@ -411,7 +420,7 @@ Email routing — pick exactly one of these outcomes:
 - **Not first-Tuesday, deals exist** → send deal email with the subject format above.
 - **Not first-Tuesday, no deals** → send nothing.
 
-Recipient is `config/settings.json:email_recipient`. Use `mcp__...__gmail_create_draft` then send, or whatever send primitive the Gmail MCP exposes. After sending, do **not** leave it as a draft — it should go out.
+Recipient is `TRAVELLER_EMAIL` from `.env`. Use `mcp__...__gmail_create_draft` then send, or whatever send primitive the Gmail MCP exposes. After sending, do **not** leave it as a draft — it should go out.
 
 ---
 

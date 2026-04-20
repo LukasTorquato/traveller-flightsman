@@ -1,8 +1,4 @@
 {
-  "origin_iata": "DUB",
-  "currency": "EUR",
-  "email_recipient": "lukasmtorquato@gmail.com",
-
   "trip_profiles": {
     "europe_short_haul": {
       "preferred_nights_range": [1, 2],

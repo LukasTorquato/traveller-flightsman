@@ -10,6 +10,16 @@ build/
 .pytest_cache/
 .ruff_cache/
 
+# Runtime scan data — private by default
+history/observations.jsonl
+!history/.gitkeep
+reports/*.md
+!reports/.gitkeep
+state/rotation.json
+!state/.gitkeep
+output/email.json
+!output/.gitkeep
+
 # IDE
 .vscode/
 .idea/

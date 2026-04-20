@@ -1,6 +1,6 @@
 # Traveller — Claude Code Project Instructions
 
-This repo is a weekly flight-deal scanner. The only routine it runs is the **weekly scan** — everything the scan does is defined in `prompts/weekly-scan.md`, which is invoked via the `/weekly-scan` slash command.
+This repo is a weekly flight-deal scanner for the repo owner. The only routine it runs is the **weekly scan** — everything the scan does is defined in `prompts/weekly-scan.md`, which is invoked via the `/weekly-scan` slash command. User-specific settings (email, origin airport, currency, timezone, name) live in `.env` at the repo root — see `.env.example` for the template.
 
 ## Triggering the scan
 
@@ -17,7 +17,7 @@ Three slash commands, pick the one that matches the user's intent:
 | "check EU flights", "european deals", "weekend trip"   | `/weekly-scan-europe`           |
 | "check intercontinental", "long-haul", "asia deals", "south america" | `/weekly-scan-intercontinental` |
 | "check travel deals", "run the weekly scan", "scan for trips" | `/weekly-scan` (both)           |
-| "cheap flights from Dublin" (generic)                  | `/weekly-scan` (both)           |
+| "cheap flights from the configured `TRAVELLER_ORIGIN_IATA`" (generic) | `/weekly-scan` (both)           |
 
 Don't improvise the scan — always delegate to the relevant slash command, which reads `prompts/weekly-scan.md` with the appropriate `scope` argument.
 

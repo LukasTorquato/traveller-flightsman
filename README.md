@@ -1,10 +1,10 @@
 # Traveller
 
-Weekly round-trip flight + accommodation deal scanner for Dublin. Runs inside **Claude Code** as a slash-command routine — no servers, no API keys, just the prompt at `prompts/weekly-scan.md` and a small math helper.
+Weekly round-trip flight + accommodation deal scanner for your configured origin airport (e.g. DUB for Dublin). Runs inside **Claude Code** as a slash-command routine — no servers, no API keys, just the prompt at `prompts/weekly-scan.md` and a small math helper.
 
 ## What it does
 Every Tuesday (or when you invoke the slash command):
-1. Claude Code web-searches for cheap round-trip fares from DUB to ~30 destinations (Europe + rotating intercontinental picks)
+1. Claude Code web-searches for cheap round-trip fares from your configured origin (e.g. DUB for Dublin) to ~30 destinations (Europe + rotating intercontinental picks)
 2. For each route, also fetches hotel prices (always) and **Airbnb** prices (for long-haul Europe + Asia only) — picks the cheapest qualifying accommodation that meets a quality floor
 3. Fetches **10 bundled-package sites** (loveholidays, Jet2, TUI, easyJet Holidays, On the Beach, Expedia, Booking.com Packages, Kayak, Trivago, Holiday Pirates) and compares DIY vs package totals
 4. Evaluates combined (flight + accommodation) totals against a tiered deal-logic (Phase 1 cold-start → Phase 2 baseline → Phase 3 hybrid)
@@ -31,13 +31,16 @@ You can also just say "check my travel deals" in natural language — `CLAUDE.md
 Departure-day bias: Mon/Tue/Fri/Sat/Sun preferred; Wed/Thu avoided.
 
 ## Quick start
-1. Edit `config/wishlist.json` to add real destinations — each entry needs a `category` matching one of the four profiles above.
-2. Connect the Gmail MCP in Claude Code (one-time OAuth).
-3. Open the repo in Claude Code and run `/weekly-scan`.
+1. Copy `.env.example` to `.env` and fill in your email, origin airport, currency, timezone, and name.
+2. Edit `config/wishlist.json` to add your real dream destinations — each entry needs a `category` field matching one of the four profiles below.
+3. Connect the Gmail MCP in Claude Code (one-time OAuth).
+4. Open the repo in Claude Code and run `/weekly-scan`.
 
 See `docs/operations/schedule-setup.md` for full setup.
 
 ## Project layout
+- `.env.example` — template for user-specific settings (email, origin airport, currency, timezone, name)
+- `LICENSE` — MIT
 - `prompts/weekly-scan.md` — the runbook Claude follows (THE product)
 - `.claude/commands/weekly-scan*.md` — slash-command entry points
 - `config/` — destinations, wishlist, thresholds, trip profiles, quality floors
@@ -62,3 +65,6 @@ Input JSON accepts either legacy flight-only schema (`current_fares_eur`, `prior
 
 ## Why no email?
 Philosophy: *"silence on a Tuesday with no outstanding deal is a feature."* Every email must answer the question *"why is this one noteworthy?"* with a concrete reason (all-time low, baseline drop, package wins, Airbnb wins, seasonal quirk, etc.). If there's no compelling reason, no email.
+
+## License
+MIT. See `LICENSE`.
