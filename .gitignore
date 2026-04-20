@@ -17,8 +17,10 @@ reports/*.md
 !reports/.gitkeep
 state/rotation.json
 !state/.gitkeep
-output/email.json
-!output/.gitkeep
+
+# Claude Code local settings and session state
+.claude/settings.local.json
+.planning/
 
 # IDE
 .vscode/
