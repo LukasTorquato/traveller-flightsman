@@ -3,37 +3,45 @@
 This routine runs inside Claude Code — no external cron, no remote scheduled agent.
 
 ## One-time setup
-
 1. Clone this repo to your machine.
 2. Ensure Python 3.12+ is on PATH (the math helper needs it).
 3. Install dev deps if you plan to run tests: `pip install -e ".[dev]"`.
-4. Populate `config/wishlist.json` with your real dream destinations.
+4. Populate `config/wishlist.json` with your real dream destinations. Each entry needs a `category` field matching one of: `europe_short_haul`, `europe_long_haul`, `intercontinental_asia`, `intercontinental_south_america`.
 5. Connect the Gmail MCP to your account inside Claude Code (one-time OAuth).
 6. Make sure this repo has a remote configured (`git remote -v`) if you want commits pushed automatically.
 
-## Manual weekly invocation (recommended)
+## Weekly invocation
 
-Every Tuesday (or whenever you want to scan), open this repo in Claude Code and run:
+You have three slash commands available, all following `prompts/weekly-scan.md`:
 
-    /weekly-scan
+| Command | Scope | Runtime estimate |
+|---|---|---|
+| `/weekly-scan` | Both (Europe + Intercontinental) | ~30-40 min |
+| `/weekly-scan-europe` | Europe only | ~15-20 min |
+| `/weekly-scan-intercontinental` | Asia + South America only | ~15-20 min |
 
-Claude follows `prompts/weekly-scan.md` end-to-end. The whole scan takes ~5–10 minutes with web searches.
+Use the canonical `/weekly-scan` if you want one combined email + one commit covering everything. Use the split commands if you want to run them at different times, or if the combined run is timing out.
 
 ## Automated invocation via /loop (optional)
-
-If you want it to run automatically on a weekly cadence, you can use Claude Code's `/loop` feature:
+If you want weekly cadence without a manual trigger:
 
     /loop 7d /weekly-scan
 
-(or set a cron equivalent via the scheduled-tasks MCP if you prefer)
+Or use the scheduled-tasks MCP if you prefer a cron-style trigger.
 
 ## Verifying each run
-
-- `git log --oneline` should show a new `chore(traveller): weekly scan ...` commit.
-- `reports/YYYY-MM-DD.md` should exist for every run.
-- `history/observations.jsonl` should grow by one `run_metadata` row per run.
-- Your inbox should have an email if deals were found, or no email if none.
+- `git log --oneline` should show a new `chore(traveller): weekly scan ...` commit per invocation.
+- `reports/YYYY-MM-DD.md` should exist.
+- `history/observations.jsonl` should grow by one `run_metadata` row per run (plus observation rows per route).
+- Your inbox should have an email if deals passed the reasoning ladder, or no email if none did.
 
 ## Silent-failure check
+On the 1st Tuesday of each month, you get a `📊 Travel scan monthly health` email regardless of deal outcomes. If that email doesn't arrive, the routine has likely broken — check the git log for the last run date.
 
-On the 1st Tuesday of each month, you'll get a `📊 Travel scan monthly health` email. If that email doesn't arrive, the routine has likely broken — check the git log for the last run date.
+## Data sources used
+- **Flights:** WebSearch / WebFetch across Google Flights, Skyscanner, Kayak, airline-direct deal pages (Ryanair, Aer Lingus).
+- **Hotels:** Booking.com (quality floor: rating >= 7.5, >= 100 reviews, top 10 -> median of cheapest 3).
+- **Airbnb:** for `europe_long_haul` and `intercontinental_asia` only (quality floor: rating >= 4.5, >= 50 reviews, "Entire place" only, same sampling rule as hotels).
+- **Bundled packages:** loveholidays, Jet2 Holidays, TUI, easyJet Holidays, On the Beach, Expedia, Booking.com Packages, Kayak Packages, Trivago Packages, Holiday Pirates.
+
+Some sites will be blocked / CAPTCHA'd on any given run; Claude treats these as "not offered" and moves on. No retries.
