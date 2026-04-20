@@ -1,11 +1,23 @@
-Run the weekly travel deals scan for Dublin round trips.
+Run the full weekly travel deals scan for Dublin round trips — both Europe and Intercontinental scopes.
 
-Read and follow the full runbook at `prompts/weekly-scan.md` from start to finish. Do not deviate — that file is the source of truth.
+This is the canonical weekly entry point. It runs `prompts/weekly-scan.md` end-to-end twice with different scope parameters, then produces ONE combined report and ONE git commit.
+
+Scope order (do not reorder):
+1. Run the runbook with `scope: europe` — covers `europe_short_haul`, `europe_long_haul`, and any wishlist entries whose `category` falls into those two buckets.
+2. Run the runbook with `scope: intercontinental` — covers `intercontinental_asia`, `intercontinental_south_america`, and any wishlist entries in those buckets.
+
+Merge the two scope runs into a single output:
+- `reports/YYYY-MM-DD.md` — one combined report (not two). Group by scope section; total deals flagged across both scopes.
+- `history/observations.jsonl` — append all observation rows from both scopes + ONE final `run_metadata` row covering the combined run.
+- `state/rotation.json` — update cursors from the intercontinental run (the europe run doesn't use rotation).
+- Email — if any deals across BOTH scopes, send ONE email combining them. If first Tuesday of month, send ONE health email combining both.
+- `git commit` — one commit covering both scopes.
 
 Today's date is used as the `run_date`. Dublin-local time determines whether this is the first Tuesday of the month.
 
 When finished, report back with:
-- Number of routes scanned
-- Number of deals flagged
-- Whether email was sent
+- Number of routes scanned (per scope + total)
+- Number of deals flagged (per scope + total)
+- Accommodation-source breakdown (hotel / airbnb / n/a for same-day)
+- Whether email was sent and its subject
 - Git commit SHA
