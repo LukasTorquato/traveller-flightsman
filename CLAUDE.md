@@ -4,13 +4,22 @@ This repo is a weekly flight-deal scanner. The only routine it runs is the **wee
 
 ## Triggering the scan
 
-When the user asks in natural language to:
-- "check the travel deals" / "check my flight deals" / "any good flight deals?"
-- "run the weekly scan" / "run the travel routine" / "scan for trips"
-- "look for Dublin flight deals" / "find cheap flights from Dublin"
-- any similar phrasing about travel deals, flights from DUB, or running the scanner
+Three slash commands, pick the one that matches the user's intent:
 
-→ Invoke `/weekly-scan`. Don't improvise the scan — follow the slash command, which reads `prompts/weekly-scan.md`.
+- `/weekly-scan` — runs **both** scopes back-to-back (canonical combined run, produces one unified report).
+- `/weekly-scan-europe` — `europe_short_haul` + `europe_long_haul` + EU-category wishlist entries only.
+- `/weekly-scan-intercontinental` — `intercontinental_asia` + `intercontinental_south_america` + intercontinental-category wishlist entries only.
+
+### Natural-language routing
+
+| User phrasing                                          | Slash command                   |
+|--------------------------------------------------------|---------------------------------|
+| "check EU flights", "european deals", "weekend trip"   | `/weekly-scan-europe`           |
+| "check intercontinental", "long-haul", "asia deals", "south america" | `/weekly-scan-intercontinental` |
+| "check travel deals", "run the weekly scan", "scan for trips" | `/weekly-scan` (both)           |
+| "cheap flights from Dublin" (generic)                  | `/weekly-scan` (both)           |
+
+Don't improvise the scan — always delegate to the relevant slash command, which reads `prompts/weekly-scan.md` with the appropriate `scope` argument.
 
 ## Editing config vs running the scan
 
