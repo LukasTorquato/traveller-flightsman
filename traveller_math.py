@@ -12,37 +12,41 @@ the weekly scan. Three subcommands:
 `evaluate` reads a JSON file describing routes + settings and prints a JSON
 object with deal verdicts per route. Phase logic mirrors the original design:
 
-    phase 1 (cold start): is_deal if best_price <= PHASE1_P15_FACTOR *
-                          p15(current_fares) AND best_price <= ceiling
-    phase 2 (baseline):   is_deal if discount vs median(prior_prices) >=
+    phase 1 (cold start): is_deal if best <= PHASE1_P15_FACTOR *
+                          p15(current) AND best <= ceiling
+    phase 2 (baseline):   is_deal if discount vs median(prior) >=
                           threshold (25% non-wishlist, 15% wishlist)
-                          AND best_price <= ceiling
+                          AND best <= ceiling
     phase 3 (hybrid):     is_deal only if BOTH phase 1 and phase 2 fire.
 
-Ceiling = ceilings_eur[category], multiplied by wishlist_ceiling_multiplier
-when the route is wishlisted.
+Two input schemas are accepted per route:
 
-Input JSON schema for `evaluate`:
+v1 (legacy flight-only):
     {
-      "routes": [
-        {
-          "destination_iata": "BCN",
-          "is_wishlist": false,
-          "category": "europe_short_haul",
-          "current_fares_eur": [48.5, 62.0, 75.0],
-          "prior_prices_eur": [80.0, 82.0, 85.0]
-        }
-      ],
-      "settings": {
-        "cold_start_p_percentile": 15,
-        "phase1_max_obs": 3,
-        "phase2_max_obs": 11,
-        "phase2_min_discount_pct_non_wishlist": 25,
-        "phase2_min_discount_pct_wishlist": 15,
-        "ceilings_eur": {"europe_short_haul": 80, ...},
-        "wishlist_ceiling_multiplier": 1.3
-      }
+      "destination_iata": "BCN",
+      "is_wishlist": false,
+      "category": "europe_short_haul",
+      "current_fares_eur": [48.5, 62.0, 75.0],
+      "prior_prices_eur": [80.0, 82.0, 85.0]
     }
+  settings must include `ceilings_eur` mapping.
+  Output verdict keys: best_price_eur, market_p15_eur, baseline_median_eur,
+  ceiling_eur.
+
+v2 (combined flight + accommodation totals):
+    {
+      "destination_iata": "BCN",
+      "is_wishlist": false,
+      "category": "europe_short_haul",
+      "trip_profile": "short_haul_1_night",
+      "nights": 1,
+      "current_combined_totals_eur": [100.5, 112.0, 125.0],
+      "prior_combined_totals_eur": [118.0, 122.0],
+      "combined_ceiling_eur": 120.0
+    }
+  Ceiling is caller-supplied per route — settings do not need `ceilings_eur`.
+  Output verdict keys: best_combined_eur, market_p15_combined_eur,
+  baseline_median_combined_eur, combined_ceiling_eur.
 
 Output JSON schema: see docstring of `evaluate_routes`.
 """
@@ -54,11 +58,11 @@ import statistics
 import sys
 from pathlib import Path
 
-# Phase 1 tightness factor: best_price must be <= PHASE1_P15_FACTOR * p15 to
+# Phase 1 tightness factor: best must be <= PHASE1_P15_FACTOR * p15 to
 # count as meaningfully below the market. With small web-search samples (5-10
-# fares), p15 lands close to the minimum and a naive best<=p15 bar is trivially
-# easy to clear. This factor forces a real discount vs the bottom of the listed
-# market.
+# observations), p15 lands close to the minimum and a naive best<=p15 bar is
+# trivially easy to clear. This factor forces a real discount vs the bottom of
+# the listed market.
 PHASE1_P15_FACTOR = 0.85
 
 
@@ -91,21 +95,54 @@ def _select_phase(prior_count: int, phase1_max: int, phase2_max: int) -> int:
     return 3
 
 
+def _resolve_schema(route: dict) -> dict:
+    """Detect input shape and resolve input/output field names.
+
+    v2 path: route contains `current_combined_totals_eur` — use combined-total
+    naming throughout. v1 path: legacy `current_fares_eur` — preserve original
+    flight-only key names.
+    """
+    if "current_combined_totals_eur" in route:
+        return {
+            "version": "v2",
+            "current_key": "current_combined_totals_eur",
+            "prior_key": "prior_combined_totals_eur",
+            "out_best": "best_combined_eur",
+            "out_p15": "market_p15_combined_eur",
+            "out_baseline": "baseline_median_combined_eur",
+            "out_ceiling": "combined_ceiling_eur",
+        }
+    return {
+        "version": "v1",
+        "current_key": "current_fares_eur",
+        "prior_key": "prior_prices_eur",
+        "out_best": "best_price_eur",
+        "out_p15": "market_p15_eur",
+        "out_baseline": "baseline_median_eur",
+        "out_ceiling": "ceiling_eur",
+    }
+
+
 def _effective_ceiling(route: dict, settings: dict) -> float:
-    category = route["category"]
-    base = float(settings["ceilings_eur"][category])
+    # v2 path: caller pre-computes and passes combined_ceiling_eur.
+    if "combined_ceiling_eur" in route:
+        base = float(route["combined_ceiling_eur"])
+    else:
+        # v1 legacy path: look up by category in settings.ceilings_eur.
+        category = route["category"]
+        base = float(settings["ceilings_eur"][category])
     if route.get("is_wishlist"):
         base *= float(settings["wishlist_ceiling_multiplier"])
     return base
 
 
 def _evaluate_phase1(
-    current_fares: list[float],
+    current: list[float],
     best: float,
     ceiling: float,
     pct: float,
 ) -> tuple[bool, str, float]:
-    p = percentile(current_fares, pct)
+    p = percentile(current, pct)
     threshold = PHASE1_P15_FACTOR * p
     if best > ceiling:
         return False, f"best {best:.2f} above ceiling {ceiling:.2f}", p
@@ -129,16 +166,16 @@ def _evaluate_phase1(
 
 
 def _evaluate_phase2(
-    prior_prices: list[float],
+    prior: list[float],
     best: float,
     ceiling: float,
     is_wishlist: bool,
     threshold_non_wishlist: float,
     threshold_wishlist: float,
 ) -> tuple[bool, str, float]:
-    if not prior_prices:
-        raise ValueError("phase 2 requires at least one prior price")
-    baseline = median(prior_prices)
+    if not prior:
+        raise ValueError("phase 2 requires at least one prior observation")
+    baseline = median(prior)
     threshold = threshold_wishlist if is_wishlist else threshold_non_wishlist
     if best > ceiling:
         return False, f"best {best:.2f} above ceiling {ceiling:.2f}", baseline
@@ -161,12 +198,14 @@ def _evaluate_phase2(
 def evaluate_route(route: dict, settings: dict) -> dict:
     """Produce a single verdict dict for a route.
 
-    Verdict keys: destination_iata, phase, is_deal, reason, best_price_eur,
-    market_p15_eur, baseline_median_eur, ceiling_eur.
+    Handles both v1 (flight-only) and v2 (combined-total) input schemas.
+    Output field names reflect which input schema was used — see
+    `_resolve_schema` for the mapping.
     """
+    schema = _resolve_schema(route)
     iata = route["destination_iata"]
-    current = [float(x) for x in route.get("current_fares_eur", [])]
-    prior = [float(x) for x in route.get("prior_prices_eur", [])]
+    current = [float(x) for x in route.get(schema["current_key"], [])]
+    prior = [float(x) for x in route.get(schema["prior_key"], [])]
     ceiling = _effective_ceiling(route, settings)
     phase = _select_phase(
         len(prior),
@@ -180,10 +219,10 @@ def evaluate_route(route: dict, settings: dict) -> dict:
             "phase": phase,
             "is_deal": False,
             "reason": "no fares provided",
-            "best_price_eur": None,
-            "market_p15_eur": None,
-            "baseline_median_eur": None,
-            "ceiling_eur": ceiling,
+            schema["out_best"]: None,
+            schema["out_p15"]: None,
+            schema["out_baseline"]: None,
+            schema["out_ceiling"]: ceiling,
         }
 
     best = min(current)
@@ -197,10 +236,10 @@ def evaluate_route(route: dict, settings: dict) -> dict:
             "phase": 1,
             "is_deal": is_deal,
             "reason": reason,
-            "best_price_eur": best,
-            "market_p15_eur": p_val,
-            "baseline_median_eur": None,
-            "ceiling_eur": ceiling,
+            schema["out_best"]: best,
+            schema["out_p15"]: p_val,
+            schema["out_baseline"]: None,
+            schema["out_ceiling"]: ceiling,
         }
 
     # Phase 2 and 3 both need p1 value for historical continuity
@@ -220,10 +259,10 @@ def evaluate_route(route: dict, settings: dict) -> dict:
             "phase": 2,
             "is_deal": is_deal,
             "reason": reason,
-            "best_price_eur": best,
-            "market_p15_eur": p_val,
-            "baseline_median_eur": baseline,
-            "ceiling_eur": ceiling,
+            schema["out_best"]: best,
+            schema["out_p15"]: p_val,
+            schema["out_baseline"]: baseline,
+            schema["out_ceiling"]: ceiling,
         }
 
     # Phase 3: both phase 1 and phase 2 must agree
@@ -247,17 +286,19 @@ def evaluate_route(route: dict, settings: dict) -> dict:
         "phase": 3,
         "is_deal": is_deal,
         "reason": reason,
-        "best_price_eur": best,
-        "market_p15_eur": p1_val,
-        "baseline_median_eur": baseline,
-        "ceiling_eur": ceiling,
+        schema["out_best"]: best,
+        schema["out_p15"]: p1_val,
+        schema["out_baseline"]: baseline,
+        schema["out_ceiling"]: ceiling,
     }
 
 
 def evaluate_routes(payload: dict) -> dict:
     """Evaluate all routes in the input payload.
 
-    Returns {"verdicts": [ {...verdict...}, ... ]}.
+    Returns {"verdicts": [ {...verdict...}, ... ]}. Each verdict's field names
+    reflect the input schema used for that route (v1 or v2) — see
+    `_resolve_schema`.
     """
     settings = payload["settings"]
     verdicts = [evaluate_route(r, settings) for r in payload["routes"]]

@@ -274,3 +274,166 @@ def test_cli_evaluate(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> Non
     assert rc == 0
     result = json.loads(capsys.readouterr().out)
     assert result["verdicts"][0]["is_deal"] is True
+
+
+# ---- evaluate: combined-total input schema (v2) ----------------------------
+
+
+_V2_SETTINGS = {
+    "cold_start_p_percentile": 15,
+    "phase1_max_obs": 3,
+    "phase2_max_obs": 11,
+    "phase2_min_discount_pct_non_wishlist": 25,
+    "phase2_min_discount_pct_wishlist": 15,
+    "wishlist_ceiling_multiplier": 1.3,
+}
+
+
+def _v2_route(**overrides):
+    base = {
+        "destination_iata": "BCN",
+        "is_wishlist": False,
+        "category": "europe_short_haul",
+        "trip_profile": "short_haul_1_night",
+        "nights": 1,
+        "current_combined_totals_eur": [100.5, 112.0, 125.0, 140.0, 150.0],
+        "prior_combined_totals_eur": [],
+        "combined_ceiling_eur": 120.0,
+    }
+    base.update(overrides)
+    return base
+
+
+def test_evaluate_v2_accepts_combined_totals_and_ceiling() -> None:
+    # combined totals: [60, 90, 100, 110, 120] → p15 = 60+0.6*30 = 78
+    # threshold = 0.85*78 = 66.3. best = 60 <= 66.3 and <= ceiling 120.
+    route = _v2_route(
+        current_combined_totals_eur=[60.0, 90.0, 100.0, 110.0, 120.0],
+        combined_ceiling_eur=120.0,
+    )
+    result = tm.evaluate_routes({"routes": [route], "settings": _V2_SETTINGS})
+    verdict = result["verdicts"][0]
+    assert verdict["phase"] == 1
+    assert verdict["is_deal"] is True
+    # v2 output uses combined-total field names
+    assert verdict["best_combined_eur"] == 60.0
+    assert verdict["combined_ceiling_eur"] == 120.0
+    assert verdict["baseline_median_combined_eur"] is None
+    assert verdict["market_p15_combined_eur"] is not None
+
+
+def test_evaluate_v2_phase2_uses_prior_combined_totals() -> None:
+    # 4 priors → phase 2. median = 155. best = 100 → 35.5% discount, threshold 25%.
+    route = _v2_route(
+        current_combined_totals_eur=[100.0, 130.0, 140.0],
+        prior_combined_totals_eur=[140.0, 150.0, 160.0, 170.0],
+        combined_ceiling_eur=180.0,
+    )
+    result = tm.evaluate_routes({"routes": [route], "settings": _V2_SETTINGS})
+    verdict = result["verdicts"][0]
+    assert verdict["phase"] == 2
+    assert verdict["is_deal"] is True
+    assert verdict["baseline_median_combined_eur"] == pytest.approx(155.0)
+
+
+def test_evaluate_v2_respects_explicit_combined_ceiling() -> None:
+    # best = 60, but ceiling = 50 → should fail on ceiling
+    route = _v2_route(
+        current_combined_totals_eur=[60.0, 90.0, 100.0],
+        combined_ceiling_eur=50.0,
+    )
+    result = tm.evaluate_routes({"routes": [route], "settings": _V2_SETTINGS})
+    verdict = result["verdicts"][0]
+    assert verdict["is_deal"] is False
+    assert "ceiling" in verdict["reason"]
+    assert verdict["combined_ceiling_eur"] == 50.0
+
+
+def test_evaluate_legacy_flight_only_schema_still_works() -> None:
+    # Legacy v1 call path (current_fares_eur + ceilings_eur in settings) unchanged
+    legacy_settings = {
+        **_V2_SETTINGS,
+        "ceilings_eur": {"europe_short_haul": 80},
+    }
+    legacy_route = {
+        "destination_iata": "BCN",
+        "is_wishlist": False,
+        "category": "europe_short_haul",
+        "current_fares_eur": [30.0, 60.0, 70.0, 80.0, 90.0],
+        "prior_prices_eur": [],
+    }
+    result = tm.evaluate_routes(
+        {"routes": [legacy_route], "settings": legacy_settings}
+    )
+    verdict = result["verdicts"][0]
+    assert verdict["is_deal"] is True
+    # v1 output shape preserved
+    assert "best_price_eur" in verdict
+    assert verdict["best_price_eur"] == 30.0
+    assert "ceiling_eur" in verdict
+
+
+def test_evaluate_v2_phase3_hybrid_uses_combined_field_names() -> None:
+    # 12 priors → phase 3. Current fares [150,180,200,220,250] → p15 = 150+0.6*30 = 168
+    # threshold = 0.85*168 = 142.8. best = 150 > 142.8 → phase1 fails.
+    # Since phase3 needs BOTH, this should be is_deal False.
+    priors = [200.0, 210.0, 220.0, 230.0] * 3  # 12 priors
+    route = _v2_route(
+        current_combined_totals_eur=[150.0, 180.0, 200.0, 220.0, 250.0],
+        prior_combined_totals_eur=priors,
+        combined_ceiling_eur=300.0,
+    )
+    result = tm.evaluate_routes({"routes": [route], "settings": _V2_SETTINGS})
+    verdict = result["verdicts"][0]
+    assert verdict["phase"] == 3
+    # v2 field names present regardless of phase
+    assert "best_combined_eur" in verdict
+    assert "market_p15_combined_eur" in verdict
+    assert "baseline_median_combined_eur" in verdict
+    assert "combined_ceiling_eur" in verdict
+
+
+def test_evaluate_v2_wishlist_ceiling_multiplier_applied() -> None:
+    # combined_ceiling_eur=100, wishlist=True → effective ceiling 130.
+    # best=110 should pass ceiling when wishlist, but not when non-wishlist.
+    route_wl = _v2_route(
+        destination_iata="BKK",
+        category="intercontinental_asia",
+        is_wishlist=True,
+        current_combined_totals_eur=[110.0, 120.0, 130.0, 140.0, 150.0],
+        combined_ceiling_eur=100.0,
+    )
+    result = tm.evaluate_routes({"routes": [route_wl], "settings": _V2_SETTINGS})
+    verdict = result["verdicts"][0]
+    # Ceiling reported as the multiplied value (100 * 1.3 = 130)
+    assert verdict["combined_ceiling_eur"] == pytest.approx(130.0)
+
+
+def test_evaluate_v2_empty_combined_totals_graceful() -> None:
+    route = _v2_route(current_combined_totals_eur=[])
+    result = tm.evaluate_routes({"routes": [route], "settings": _V2_SETTINGS})
+    verdict = result["verdicts"][0]
+    assert verdict["is_deal"] is False
+    assert verdict["best_combined_eur"] is None
+    assert "no fares" in verdict["reason"] or "no combined" in verdict["reason"]
+
+
+def test_cli_evaluate_v2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    payload = {
+        "routes": [
+            _v2_route(
+                current_combined_totals_eur=[60.0, 90.0, 100.0, 110.0, 120.0],
+                combined_ceiling_eur=120.0,
+            )
+        ],
+        "settings": _V2_SETTINGS,
+    }
+    input_path = tmp_path / "in_v2.json"
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+    rc = tm.main(["traveller_math.py", "evaluate", str(input_path)])
+    assert rc == 0
+    result = json.loads(capsys.readouterr().out)
+    verdict = result["verdicts"][0]
+    assert verdict["is_deal"] is True
+    assert "best_combined_eur" in verdict
+    assert "combined_ceiling_eur" in verdict
