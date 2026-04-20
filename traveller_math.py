@@ -12,8 +12,8 @@ the weekly scan. Three subcommands:
 `evaluate` reads a JSON file describing routes + settings and prints a JSON
 object with deal verdicts per route. Phase logic mirrors the original design:
 
-    phase 1 (cold start): is_deal if best_price <= p15(current_fares)
-                          AND best_price <= ceiling
+    phase 1 (cold start): is_deal if best_price <= PHASE1_P15_FACTOR *
+                          p15(current_fares) AND best_price <= ceiling
     phase 2 (baseline):   is_deal if discount vs median(prior_prices) >=
                           threshold (25% non-wishlist, 15% wishlist)
                           AND best_price <= ceiling
@@ -53,6 +53,13 @@ import json
 import statistics
 import sys
 from pathlib import Path
+
+# Phase 1 tightness factor: best_price must be <= PHASE1_P15_FACTOR * p15 to
+# count as meaningfully below the market. With small web-search samples (5-10
+# fares), p15 lands close to the minimum and a naive best<=p15 bar is trivially
+# easy to clear. This factor forces a real discount vs the bottom of the listed
+# market.
+PHASE1_P15_FACTOR = 0.85
 
 
 def percentile(values: list[float], pct: float) -> float:
@@ -99,11 +106,26 @@ def _evaluate_phase1(
     pct: float,
 ) -> tuple[bool, str, float]:
     p = percentile(current_fares, pct)
+    threshold = PHASE1_P15_FACTOR * p
     if best > ceiling:
         return False, f"best {best:.2f} above ceiling {ceiling:.2f}", p
-    if best > p:
-        return False, f"best {best:.2f} above p{int(pct)} {p:.2f}", p
-    return True, f"best {best:.2f} <= p{int(pct)} {p:.2f} and <= ceiling {ceiling:.2f}", p
+    if best > threshold:
+        return (
+            False,
+            (
+                f"best {best:.2f} > {PHASE1_P15_FACTOR}×p{int(pct)} "
+                f"({threshold:.2f}) — not meaningfully below market"
+            ),
+            p,
+        )
+    return (
+        True,
+        (
+            f"best {best:.2f} <= {PHASE1_P15_FACTOR}×p{int(pct)} "
+            f"({threshold:.2f}) and <= ceiling {ceiling:.2f}"
+        ),
+        p,
+    )
 
 
 def _evaluate_phase2(

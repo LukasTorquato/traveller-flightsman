@@ -83,16 +83,33 @@ def _route(**overrides):
 # ---- evaluate: phase 1 ------------------------------------------------------
 
 
-def test_evaluate_phase1_fires_when_best_below_p15_and_ceiling() -> None:
-    # current fares include a 48 that is <= p15 and <= ceiling 80
-    route = _route(current_fares_eur=[48.0, 60.0, 70.0, 80.0, 90.0])
+def test_evaluate_phase1_fires_when_best_below_p15_factor_and_ceiling() -> None:
+    # current fares: [30, 60, 70, 80, 90] → p15 = 30 + 0.6*30 = 48
+    # threshold = 0.85 * 48 = 40.8. best = 30 <= 40.8 and <= ceiling 80.
+    route = _route(current_fares_eur=[30.0, 60.0, 70.0, 80.0, 90.0])
     result = tm.evaluate_routes({"routes": [route], "settings": _SETTINGS})
     verdict = result["verdicts"][0]
     assert verdict["phase"] == 1
     assert verdict["is_deal"] is True
-    assert verdict["best_price_eur"] == 48.0
+    assert verdict["best_price_eur"] == 30.0
     assert verdict["ceiling_eur"] == 80.0
     assert verdict["baseline_median_eur"] is None
+
+
+def test_phase1_requires_best_meaningfully_below_p15() -> None:
+    """best at p15 exactly no longer flags; best at 0.85xp15 does."""
+    # 20 fares: 50, 51, ..., 69. p15 ≈ 52.85. 0.85xp15 ≈ 44.92.
+    # best=50 is below p15 but above 0.85xp15 → NOT a deal.
+    fares = [50.0 + i for i in range(20)]
+    route = _route(current_fares_eur=fares)
+    result = tm.evaluate_routes({"routes": [route], "settings": _SETTINGS})
+    verdict = result["verdicts"][0]
+    assert verdict["phase"] == 1
+    assert verdict["is_deal"] is False
+    assert (
+        "0.85" in verdict["reason"]
+        or "not meaningfully below" in verdict["reason"]
+    )
 
 
 def test_evaluate_phase1_fails_when_best_above_ceiling() -> None:
@@ -174,9 +191,10 @@ def test_evaluate_phase2_empty_prior_raises() -> None:
 def test_evaluate_phase3_requires_both_phases_to_fire() -> None:
     # 12 priors → phase 3 (phase2_max_obs=11)
     priors_median_82_5 = [70.0, 80.0, 85.0, 90.0] * 3  # 12 vals, median 82.5
-    # best = 48 → passes p1 (<=p15 & <= ceiling 80) AND p2 (>25% discount)
+    # current: [30, 60, 70, 80, 90] → p15 = 48, threshold = 0.85*48 = 40.8
+    # best = 30 → passes p1 (30 <= 40.8 & <= ceiling 80) AND p2 (>25% discount)
     route_both = _route(
-        current_fares_eur=[48.0, 60.0, 70.0, 80.0, 90.0],
+        current_fares_eur=[30.0, 60.0, 70.0, 80.0, 90.0],
         prior_prices_eur=priors_median_82_5,
     )
     result = tm.evaluate_routes({"routes": [route_both], "settings": _SETTINGS})
@@ -247,7 +265,7 @@ def test_cli_median(capsys: pytest.CaptureFixture[str]) -> None:
 
 def test_cli_evaluate(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     payload = {
-        "routes": [_route(current_fares_eur=[48.0, 60.0, 70.0, 80.0, 90.0])],
+        "routes": [_route(current_fares_eur=[30.0, 60.0, 70.0, 80.0, 90.0])],
         "settings": _SETTINGS,
     }
     input_path = tmp_path / "in.json"
