@@ -8,6 +8,14 @@ This prompt is self-contained. Follow every step in order. The working directory
 
 ---
 
+## Philosophy
+
+Silence on a Tuesday with no outstanding deal is a feature, not a bug. The user's explicit request: *"I want to know about the deals, not average good prices."*
+
+Every email should answer the question *"why is this one noteworthy?"* with a concrete reason. If you can't, don't email.
+
+---
+
 ## Prerequisites to verify before starting
 
 Before doing anything else, check all of the following. If any fails, STOP and email a failure notice via Gmail MCP (subject: `⚠️ Travel scan FAILED — <short reason>`).
@@ -253,22 +261,63 @@ Use `json.dumps(..., indent=2)` formatting (pretty-printed).
 
 ---
 
-## 11. Email (conditional)
+## 11. Filter math-verdicts to REAL deals (with reasoning)
 
-Pick exactly one of these outcomes:
+The `traveller_math.py evaluate` script gives you a binary `is_deal` per route based on phase math. **This is a necessary but not sufficient condition for emailing the user.** Before an email goes out, each flagged route MUST also have a compelling human-readable reason.
 
-- **Both first-Tuesday AND deals exist** → send **one** health email that ALSO includes the deals at the top of the body. Subject: `📊 Travel scan monthly health — <Month Year>`.
-- **First-Tuesday, no deals** → send health email. Subject: `📊 Travel scan monthly health — <Month Year>`. Body: run count this past month + deal count + errors, from `history/observations.jsonl`'s `run_metadata` rows.
-- **Not first-Tuesday, deals exist** → send deal email. Subject: `✈️ N travel deals this week — <cities>` (e.g. `✈️ 2 travel deals this week — Barcelona, Bangkok`).
-- **Not first-Tuesday, no deals** → send nothing.
+For each route where `is_deal == true`, build a **reason** from these (in order of preference):
 
-Email body (for deal email) should contain, per deal: city, price, dates, nights, airline, phase, reason, and booking link. Keep it scannable — prefer an HTML table or bullet list. Recipient is `config/settings.json:email_recipient`.
+1. **All-time low for this route** — scan `history/observations.jsonl`. If `best_price_eur` is the lowest ever recorded for this `destination_iata`, cite it: "all-time low — previous best was €X on YYYY-MM-DD".
+2. **Well below recent baseline** — if there are ≥4 prior observations (Phase 2+), the math already gives you `baseline_median_eur`. If current is ≥30% below, cite: "30%+ below your 12-week median of €X".
+3. **Well below the p15 market reference** — if the math flagged it for Phase 1, cite: "bottom-15% of currently-listed fares (p15=€X, current=€Y, ≥15% cheaper)".
+4. **Seasonally striking** — use your general knowledge of typical travel prices. If the current price is unusually low for the time of year (e.g., €40 DUB→Rome in July is genuinely unusual), say so. Be honest: "this feels cheap for peak summer" is valid; "this is cheap" alone is not.
+5. **Wishlist** — being on the wishlist is never a reason by itself, but it can lower the threshold for the reasons above (the math already handles this via looser discount thresholds).
 
-Use `mcp__...__gmail_create_draft` then send, or whatever send primitive the Gmail MCP exposes. After sending, do **not** save the draft as draft — it should go out.
+**If you cannot cite a specific, concrete reason from 1–4 above, DO NOT include the route in the email.** Move it to the "Routes scanned (no compelling deal)" section of the markdown report. A route being merely under the ceiling is NOT a deal. A route being cheap when history has only 0–2 prior observations is NOT confidently a deal — it's a data point.
 
 ---
 
-## 12. Commit and push
+## 12. Compose the email
+
+- **Subject:** `✈️ N travel deals this week — <top-deal-city> €<price> <reason-tag>` where `<reason-tag>` is a short marker like "all-time low", "seasonal", or "-30% vs baseline". If N=0, no email (unless it's a monthly health email day).
+- **Body:** one block per deal. Each block MUST contain:
+  - City + IATA
+  - Price, dates, airline
+  - **"Why this is a deal:"** — the concrete reason from step 11.
+  - Book link
+
+**Example email body block (good):**
+```
+✈️ BARCELONA (BCN) — €38 return
+Jun 12 → Jun 15 (3 nights, Ryanair direct)
+Why this is a deal: all-time low — your previous best was €52 on 2026-03-10.
+→ Book: https://kiwi.com/deep/...
+```
+
+**Example email body block (bad, do not send):**
+```
+✈️ BARCELONA — €72 return
+Why: cheap.
+```
+
+Email routing — pick exactly one of these outcomes:
+
+- **Both first-Tuesday AND deals exist** → send **one** health email that ALSO includes the deals at the top of the body. Subject: `📊 Travel scan monthly health — <Month Year>`.
+- **First-Tuesday, no deals** → send health email. Subject: `📊 Travel scan monthly health — <Month Year>`. Body: run count this past month + deal count + errors, from `history/observations.jsonl`'s `run_metadata` rows.
+- **Not first-Tuesday, deals exist** → send deal email with the subject format above.
+- **Not first-Tuesday, no deals** → send nothing.
+
+Recipient is `config/settings.json:email_recipient`. Use `mcp__...__gmail_create_draft` then send, or whatever send primitive the Gmail MCP exposes. After sending, do **not** save the draft as draft — it should go out.
+
+---
+
+## 13. Sanity check: if every route "flagged"
+
+If the math flagged >50% of scanned routes, treat that as a signal that the cold-start noise is too high. Keep only the 3 strongest deal-reasons and demote the rest. Mention in the report that more routes were in range but needed stronger signal. This prevents the "spammy first email" problem while history is being built.
+
+---
+
+## 14. Commit and push
 
 ```bash
 git add history/observations.jsonl reports/ state/rotation.json
