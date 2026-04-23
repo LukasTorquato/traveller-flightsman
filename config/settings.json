@@ -24,9 +24,9 @@
 
   "category_cost_caps_eur": {
     "europe_short_haul":        { "flight": 45,  "hotel_per_night": 75 },
-    "europe_long_haul":         { "flight": 90,  "hotel_per_night": 100 },
-    "intercontinental_asia":    { "flight": 500, "hotel_per_night": 80 },
-    "intercontinental_south_america": { "flight": 550, "hotel_per_night": 70 }
+    "europe_long_haul":         { "flight": 200,  "hotel_per_night": 100 },
+    "intercontinental_asia":    { "flight": 1000, "hotel_per_night": 80 },
+    "intercontinental_south_america": { "flight": 900, "hotel_per_night": 70 }
   },
 
   "wishlist_ceiling_multiplier": 1.3,
