@@ -2,7 +2,7 @@
 
 You are running the weekly trip-deal scan for the repo owner, based at `<TRAVELLER_ORIGIN_IATA>` in `<TRAVELLER_TIMEZONE>`.
 
-Today is Tuesday (or user-triggered). Your goal: find great deals on round-trip **trips** (flight + accommodation, compared against bundled packages) from `<TRAVELLER_ORIGIN_IATA>`, flag only the interesting ones, and email the recipient if any. Stay silent if none.
+This scan runs on whatever cadence the user has scheduled (or whenever they trigger it manually). Your goal: find great deals on round-trip **trips** (flight + accommodation, compared against bundled packages) from `<TRAVELLER_ORIGIN_IATA>`, flag only the interesting ones, and email the recipient if any. Stay silent if none.
 
 This prompt is self-contained. Follow every step in order. The working directory is the repo root.
 
@@ -10,7 +10,7 @@ This prompt is self-contained. Follow every step in order. The working directory
 
 ## Philosophy
 
-Silence on a Tuesday with no outstanding deal is a feature, not a bug. The user's explicit request: *"I want to know about the deals, not average good prices."*
+Silence on a scan day with no outstanding deal is a feature, not a bug. The user's explicit request: *"I want to know about the deals, not average good prices."*
 
 Every email should answer the question *"why is this one noteworthy?"* with a concrete reason. If you can't, don't email.
 
@@ -51,7 +51,7 @@ Read `.env` using the Read tool. Parse each non-empty, non-comment line as `KEY=
   - `TRAVELLER_EMAIL` → email recipient
   - `TRAVELLER_ORIGIN_IATA` → origin airport code
   - `TRAVELLER_CURRENCY` → currency code
-  - `TRAVELLER_TIMEZONE` → IANA timezone for "today" and first-Tuesday checks
+  - `TRAVELLER_TIMEZONE` → IANA timezone for "today" and the monthly-health-email check
   - `TRAVELLER_NAME` → greeting name (default `"traveller"` if empty or blank)
 
 Then read all three config JSONs into working memory (project-wide defaults — no user-specific values live here anymore):
@@ -64,12 +64,12 @@ If any required key is missing (from `.env` or `config/settings.json`), STOP and
 
 ---
 
-## 2. Determine local date and first-Tuesday check
+## 2. Determine local date and monthly-health check
 
 - Use Bash `TZ=<TRAVELLER_TIMEZONE> date +%Y-%m-%d` for the run date (substitute the value read from `.env`; e.g. `TZ=Europe/Dublin`).
-- Use `TZ=<TRAVELLER_TIMEZONE> date +%u` for day of week (`2` = Tuesday).
-- First Tuesday of the month = day of month is in `[1..7]` AND weekday is Tuesday.
-- Store: `run_date`, `is_first_tuesday` (bool). The health email is due when `is_first_tuesday` is true regardless of deal outcomes.
+- Determine whether this is the **first scan of the calendar month**: scan `history/observations.jsonl` for any `run_metadata` row whose `run_date` falls in the same `YYYY-MM` as today. If none exists, this is the first run of the month.
+- Store: `run_date`, `is_first_run_of_month` (bool). The health email is due when `is_first_run_of_month` is true regardless of deal outcomes.
+- The scan day-of-week is irrelevant — the user controls scheduling on the back end and may invoke the scan on any day. Never gate email behaviour on weekday.
 
 ---
 
@@ -413,12 +413,12 @@ Why this is a deal: bottom-15% of currently-listed combined totals (p15=€480, 
 Why: cheap.
 ```
 
-Email routing — pick exactly one of these outcomes:
+Email routing — pick exactly one of these outcomes (weekday is **never** a factor):
 
-- **Both first-Tuesday AND deals exist** → send **one** health email that ALSO includes the deals at the top of the body. Subject: `📊 Travel scan monthly health — <Month Year>`.
-- **First-Tuesday, no deals** → send health email. Subject: `📊 Travel scan monthly health — <Month Year>`. Body: run count this past month + deal count + errors, from `history/observations.jsonl`'s `run_metadata` rows.
-- **Not first-Tuesday, deals exist** → send deal email with the subject format above.
-- **Not first-Tuesday, no deals** → send nothing.
+- **First run of the month AND deals exist** → send **one** health email that ALSO includes the deals at the top of the body. Subject: `📊 Travel scan monthly health — <Month Year>`.
+- **First run of the month, no deals** → send health email. Subject: `📊 Travel scan monthly health — <Month Year>`. Body: run count over the past month + deal count + errors, derived from `history/observations.jsonl`'s `run_metadata` rows.
+- **Not first run of the month, deals exist** → send deal email with the subject format above.
+- **Not first run of the month, no deals** → send nothing.
 
 Recipient is `TRAVELLER_EMAIL` from `.env`. Use `mcp__...__gmail_create_draft` then send, or whatever send primitive the Gmail MCP exposes. After sending, do **not** leave it as a draft — it should go out.
 

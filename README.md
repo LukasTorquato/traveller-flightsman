@@ -3,7 +3,7 @@
 Weekly round-trip flight + accommodation deal scanner for your configured origin airport (e.g. DUB for Dublin). Runs inside **Claude Code** as a slash-command routine — no servers, no API keys, just the prompt at `prompts/weekly-scan.md` and a small math helper.
 
 ## What it does
-Every Tuesday (or when you invoke the slash command):
+Whenever you (or your scheduler) invoke the slash command:
 1. Claude Code web-searches for cheap round-trip fares from your configured origin (e.g. DUB for Dublin) to ~30 destinations (Europe + rotating intercontinental picks)
 2. For each route, also fetches hotel prices (always) and **Airbnb** prices (for long-haul Europe + Asia only) — picks the cheapest qualifying accommodation that meets a quality floor
 3. Fetches **10 bundled-package sites** (loveholidays, Jet2, TUI, easyJet Holidays, On the Beach, Expedia, Booking.com Packages, Kayak, Trivago, Holiday Pirates) and compares DIY vs package totals
@@ -64,7 +64,7 @@ Input JSON accepts either legacy flight-only schema (`current_fares_eur`, `prior
     pytest
 
 ## Why no email?
-Philosophy: *"silence on a Tuesday with no outstanding deal is a feature."* Every email must answer the question *"why is this one noteworthy?"* with a concrete reason (all-time low, baseline drop, package wins, Airbnb wins, seasonal quirk, etc.). If there's no compelling reason, no email.
+Philosophy: *"silence on a scan day with no outstanding deal is a feature."* Every email must answer the question *"why is this one noteworthy?"* with a concrete reason (all-time low, baseline drop, package wins, Airbnb wins, seasonal quirk, etc.). If there's no compelling reason, no email. Day of week never gates email — schedule the scan whenever suits you.
 
 ## License
 MIT. See `LICENSE`.

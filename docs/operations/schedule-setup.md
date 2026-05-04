@@ -36,7 +36,7 @@ Or use the scheduled-tasks MCP if you prefer a cron-style trigger.
 - Your inbox should have an email if deals passed the reasoning ladder, or no email if none did.
 
 ## Silent-failure check
-On the 1st Tuesday of each month, you get a `📊 Travel scan monthly health` email regardless of deal outcomes. If that email doesn't arrive, the routine has likely broken — check the git log for the last run date.
+On the **first run of each calendar month** (whichever day of the week that lands on), you get a `📊 Travel scan monthly health` email regardless of deal outcomes. If that email doesn't arrive after a scan early in a new month, the routine has likely broken — check `history/observations.jsonl` `run_metadata` rows for the last run date.
 
 ## Data sources used
 - **Flights:** WebSearch / WebFetch across Google Flights, Skyscanner, Kayak, airline-direct deal pages (Ryanair, Aer Lingus).
