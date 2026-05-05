@@ -24,11 +24,15 @@ Don't improvise the scan — always delegate to the relevant slash command, whic
 ## Editing config vs running the scan
 
 - If the user asks to **edit the wishlist, destinations, or settings**, edit the relevant file under `config/` directly. These are JSON files with schemas documented in the design spec (`docs/superpowers/specs/2026-04-16-traveller-design.md` — historical) and the prompt.
-- If the user asks to **review a past scan**, look at `reports/YYYY-MM-DD.md` and `history/observations.jsonl`.
-- If the user asks to **reset history or rotation state**, confirm before deleting anything and do it with explicit `rm` / `git rm` commands.
+- If the user asks to **review a past scan**, look at `runtime/reports/YYYY-MM-DD.md` and `runtime/history/observations.jsonl`.
+- If the user asks to **reset history or rotation state**, confirm before deleting anything and do it with explicit `rm` / `git rm` commands inside the `runtime/` submodule.
+
+## Runtime data lives in a submodule
+
+The `runtime/` directory is a private git submodule (`traveller-runtime` repo) holding `history/`, `reports/`, and `state/`. The public traveller repo only records the submodule pointer; the actual data is private. After a scan, commits happen inside `runtime/` first (push to private remote), then the parent repo bumps its submodule pointer. To pull a fresh clone with data, use `git clone --recurse-submodules` or run `git submodule update --init` after cloning.
 
 ## Boundaries
 
 - Never send an email outside of a scan run — the scan decides when to email.
 - Never make bookings — all deep links in reports are for the human.
-- Never edit `history/observations.jsonl` to fake history — this is an audit trail.
+- Never edit `runtime/history/observations.jsonl` to fake history — this is an audit trail.

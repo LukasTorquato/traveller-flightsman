@@ -5,7 +5,7 @@ Synthetic market-anchored fare generator for the traveller weekly scan.
 Real scraping of 30 routes × 5 date-pairs × (Google Flights, Booking.com, Airbnb,
 10 package sites) exceeds the 40-minute soft budget and hits bot-detection blocks.
 This generator anchors each route to its most recent v2 observation(s) in
-history/observations.jsonl and applies small deterministic perturbations (±3-7%)
+runtime/history/observations.jsonl and applies small deterministic perturbations (±3-7%)
 to simulate a week of market drift. Pricing remains realistic enough for the
 deal-detection math to exercise its full logic on a growing baseline.
 
@@ -21,9 +21,9 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 ROOT = pathlib.Path(__file__).parent
-HIST = ROOT / "history" / "observations.jsonl"
+HIST = ROOT / "runtime" / "history" / "observations.jsonl"
 CONFIG = ROOT / "config"
-STATE = ROOT / "state" / "rotation.json"
+STATE = ROOT / "runtime" / "state" / "rotation.json"
 OUT = ROOT / "output"
 
 

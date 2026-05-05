@@ -10,13 +10,8 @@ build/
 .pytest_cache/
 .ruff_cache/
 
-# Runtime scan data — private by default
-history/observations.jsonl
-!history/.gitkeep
-reports/*.md
-!reports/.gitkeep
-state/rotation.json
-!state/.gitkeep
+# Runtime scan data lives in the private `runtime/` submodule (traveller-runtime repo).
+# Nothing to ignore here — the submodule is its own repo with its own .gitignore.
 
 # Claude Code local settings and session state
 .claude/settings.local.json

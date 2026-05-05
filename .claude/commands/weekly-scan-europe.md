@@ -15,6 +15,6 @@ Accommodation:
 
 Time budget: 20 minutes soft cap. If approaching the budget, skip remaining routes and flag in report.
 
-At the end: one report file `reports/YYYY-MM-DD.md` (europe scope section only), appended observations, updated `state/rotation.json` (irrelevant for europe but leave untouched), one email (if any deals), one git commit.
+At the end: one report file `runtime/reports/YYYY-MM-DD.md` (europe scope section only), appended observations, updated `runtime/state/rotation.json` (irrelevant for europe but leave untouched), one email (if any deals), one git commit (in the `runtime/` submodule plus a pointer-bump in the parent repo).
 
 Report back with: routes scanned, deals flagged, accommodation-source breakdown, git commit SHA.

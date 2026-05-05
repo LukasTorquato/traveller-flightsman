@@ -7,9 +7,9 @@ Scope order (do not reorder):
 2. Run the runbook with `scope: intercontinental` — covers `intercontinental_asia`, `intercontinental_south_america`, and any wishlist entries in those buckets.
 
 Merge the two scope runs into a single output:
-- `reports/YYYY-MM-DD.md` — one combined report (not two). Group by scope section; total deals flagged across both scopes.
-- `history/observations.jsonl` — append all observation rows from both scopes + ONE final `run_metadata` row covering the combined run.
-- `state/rotation.json` — update cursors from the intercontinental run (the europe run doesn't use rotation).
+- `runtime/reports/YYYY-MM-DD.md` — one combined report (not two). Group by scope section; total deals flagged across both scopes.
+- `runtime/history/observations.jsonl` — append all observation rows from both scopes + ONE final `run_metadata` row covering the combined run.
+- `runtime/state/rotation.json` — update cursors from the intercontinental run (the europe run doesn't use rotation).
 - Email — if any deals across BOTH scopes, send ONE email combining them. If this is the first scan of the calendar month, send ONE health email combining both.
 - `git commit` — one commit covering both scopes.
 

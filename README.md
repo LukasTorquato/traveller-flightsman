@@ -8,7 +8,7 @@ Whenever you (or your scheduler) invoke the slash command:
 2. For each route, also fetches hotel prices (always) and **Airbnb** prices (for long-haul Europe + Asia only) — picks the cheapest qualifying accommodation that meets a quality floor
 3. Fetches **10 bundled-package sites** (loveholidays, Jet2, TUI, easyJet Holidays, On the Beach, Expedia, Booking.com Packages, Kayak, Trivago, Holiday Pirates) and compares DIY vs package totals
 4. Evaluates combined (flight + accommodation) totals against a tiered deal-logic (Phase 1 cold-start → Phase 2 baseline → Phase 3 hybrid)
-5. Appends observations to `history/observations.jsonl`
+5. Appends observations to `runtime/history/observations.jsonl` (a private git submodule — see "Runtime data" below)
 6. Writes a dated markdown report
 7. Emails you only if a deal passes the strict reasoning ladder (all-time low, baseline drop, package-beats-DIY, Airbnb-beats-hotel, etc.) — silence is a feature
 8. Commits the new history + report
@@ -46,11 +46,24 @@ See `docs/operations/schedule-setup.md` for full setup.
 - `config/` — destinations, wishlist, thresholds, trip profiles, quality floors
 - `traveller_math.py` — validation calculator (percentile / median / evaluate, supports both v1 flight-only and v2 combined-total schemas)
 - `tests/test_traveller_math.py` — tests for the calculator
-- `history/observations.jsonl` — append-only scan history (v1 and v2 rows mixed; `schema` field distinguishes)
-- `reports/YYYY-MM-DD.md` — per-run markdown reports
-- `state/rotation.json` — intercontinental rotation cursor
+- `runtime/` — **private git submodule** (`traveller-runtime` repo) holding all scan output:
+  - `runtime/history/observations.jsonl` — append-only scan history (v1 and v2 rows mixed; `schema` field distinguishes)
+  - `runtime/reports/YYYY-MM-DD.md` — per-run markdown reports
+  - `runtime/state/rotation.json` — intercontinental rotation cursor
 - `docs/superpowers/specs/` — original design + hotels/packages extension spec
 - `docs/superpowers/plans/` — implementation plans (historical)
+
+## Runtime data (`runtime/` submodule)
+
+Scan history, reports, and rotation state live in a separate **private** repo (`traveller-runtime`) mounted here as a git submodule. The public `traveller` repo only records the submodule pointer; the actual scan data is private.
+
+When cloning fresh:
+
+    git clone --recurse-submodules https://github.com/<you>/traveller.git
+    # or, if already cloned without submodules:
+    git submodule update --init runtime
+
+After each scan, the workflow commits inside `runtime/` first (push to private remote), then the parent repo bumps its submodule pointer in a follow-up commit.
 
 ## Running the math helper standalone
     python traveller_math.py percentile 15 40,50,60,70,80

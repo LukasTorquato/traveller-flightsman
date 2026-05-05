@@ -67,7 +67,7 @@ If any required key is missing (from `.env` or `config/settings.json`), STOP and
 ## 2. Determine local date and monthly-health check
 
 - Use Bash `TZ=<TRAVELLER_TIMEZONE> date +%Y-%m-%d` for the run date (substitute the value read from `.env`; e.g. `TZ=Europe/Dublin`).
-- Determine whether this is the **first scan of the calendar month**: scan `history/observations.jsonl` for any `run_metadata` row whose `run_date` falls in the same `YYYY-MM` as today. If none exists, this is the first run of the month.
+- Determine whether this is the **first scan of the calendar month**: scan `runtime/history/observations.jsonl` for any `run_metadata` row whose `run_date` falls in the same `YYYY-MM` as today. If none exists, this is the first run of the month.
 - Store: `run_date`, `is_first_run_of_month` (bool). The health email is due when `is_first_run_of_month` is true regardless of deal outcomes.
 - The scan day-of-week is irrelevant — the user controls scheduling on the back end and may invoke the scan on any day. Never gate email behaviour on weekday.
 
@@ -85,7 +85,7 @@ Start with an empty list. Then, based on `scope`:
 - **scope in {"intercontinental", "all"}:**
   - Add `config/wishlist.json` entries whose `category` is `intercontinental_asia` or `intercontinental_south_america`.
   - Rotated picks (same rotation logic as v1):
-    - Read `state/rotation.json`. Default `{"asia_cursor": 0, "south_america_cursor": 0}` if missing.
+    - Read `runtime/state/rotation.json`. Default `{"asia_cursor": 0, "south_america_cursor": 0}` if missing.
     - Take **next 3 Asia** entries from `destinations.intercontinental_asia` starting at `asia_cursor` (wrap).
     - Take **next 2 South America** entries from `destinations.intercontinental_south_america` starting at `south_america_cursor` (wrap).
 
@@ -177,9 +177,9 @@ diy_total = flight_price + nights × accommodation_price_per_night_eur
 
 Also include package totals where available. Collect all DIY totals and all package totals into `current_combined_totals_eur` (a flat list — the evaluator just needs the distribution).
 
-Build `prior_combined_totals_eur` by scanning `history/observations.jsonl` for this destination with `schema == "v2"` only. Take the most recent N = `settings.baseline.baseline_window_observations` (12) rows, extract `best_total_eur` from each. v1 rows (those without a `schema` field, or with v1-style `price_eur`) are **ignored** for combined-total baselines — Phase 2 will be cold for ~4 weeks after v2 rollout (accepted by user).
+Build `prior_combined_totals_eur` by scanning `runtime/history/observations.jsonl` for this destination with `schema == "v2"` only. Take the most recent N = `settings.baseline.baseline_window_observations` (12) rows, extract `best_total_eur` from each. v1 rows (those without a `schema` field, or with v1-style `price_eur`) are **ignored** for combined-total baselines — Phase 2 will be cold for ~4 weeks after v2 rollout (accepted by user).
 
-**Important:** when iterating `history/observations.jsonl`, do not crash on v1 rows. Just skip them for the purpose of combined-total baselines. They remain readable for the bonus flight-only signal in step 11.
+**Important:** when iterating `runtime/history/observations.jsonl`, do not crash on v1 rows. Just skip them for the purpose of combined-total baselines. They remain readable for the bonus flight-only signal in step 11.
 
 Compute `combined_ceiling_eur` per route:
 
@@ -272,7 +272,7 @@ Do this especially for wishlist routes or any surprising deal. If a verdict look
 
 ---
 
-## 8. Append observations to `history/observations.jsonl`
+## 8. Append observations to `runtime/history/observations.jsonl`
 
 For each route that got a non-skipped verdict, append **one** JSONL row — the best date-pair (the one whose total matches `best_combined_eur`). Pull the winning detail from `fare_details`.
 
@@ -302,7 +302,7 @@ Append-mode only. Never rewrite the file.
 
 ## 9. Write the dated markdown report
 
-Write `reports/<run_date>.md`. Template:
+Write `runtime/reports/<run_date>.md`. Template:
 
 ```markdown
 # Travel Deals Scan — <run_date> (<weekday>)
@@ -347,7 +347,7 @@ When `/weekly-scan` (scope=all) runs both scopes back-to-back, produce **one** r
 
 ## 10. Update rotation state
 
-Write `state/rotation.json` with advanced cursors — only advance cursors for categories that were actually scanned in this invocation:
+Write `runtime/state/rotation.json` with advanced cursors — only advance cursors for categories that were actually scanned in this invocation:
 
 ```json
 {
@@ -369,7 +369,7 @@ The `traveller_math.py evaluate` script gives you a binary `is_deal` per route b
 
 For each route where `is_deal == true`, build a **reason** using this extended ladder (in order of preference):
 
-1. **All-time low for combined trip cost** — scan v2 rows in `history/observations.jsonl`. If `best_total_eur` is the lowest ever recorded `best_total_eur` for this `destination_iata`, cite: "all-time low combined total — previous best was €X on YYYY-MM-DD".
+1. **All-time low for combined trip cost** — scan v2 rows in `runtime/history/observations.jsonl`. If `best_total_eur` is the lowest ever recorded `best_total_eur` for this `destination_iata`, cite: "all-time low combined total — previous best was €X on YYYY-MM-DD".
 2. **Well below recent combined-total baseline** — if ≥4 v2 priors exist for this route (Phase 2+), and `best_total_eur` is ≥30% below `baseline_median_combined_eur`, cite: "30%+ below your 12-week combined-total median of €X".
 3. **Well below the combined-total p15 market reference** — if the math flagged it for Phase 1, cite: "bottom-15% of currently-listed combined totals (p15=€X, best=€Y, ≥15% cheaper)".
 4. **Package beats DIY by ≥ €X** — if `best_source` starts with `"package_"` AND beats the cheapest DIY total by ≥ 15% OR ≥ €50 (whichever is smaller), cite: "package via <site> beats DIY by €X".
@@ -416,7 +416,7 @@ Why: cheap.
 Email routing — pick exactly one of these outcomes (weekday is **never** a factor):
 
 - **First run of the month AND deals exist** → send **one** health email that ALSO includes the deals at the top of the body. Subject: `📊 Travel scan monthly health — <Month Year>`.
-- **First run of the month, no deals** → send health email. Subject: `📊 Travel scan monthly health — <Month Year>`. Body: run count over the past month + deal count + errors, derived from `history/observations.jsonl`'s `run_metadata` rows.
+- **First run of the month, no deals** → send health email. Subject: `📊 Travel scan monthly health — <Month Year>`. Body: run count over the past month + deal count + errors, derived from `runtime/history/observations.jsonl`'s `run_metadata` rows.
 - **Not first run of the month, deals exist** → send deal email with the subject format above.
 - **Not first run of the month, no deals** → send nothing.
 
@@ -444,15 +444,31 @@ When `/weekly-scan` runs both scopes (40-minute total soft budget), do europe fi
 
 ## 14. Commit and push
 
+The runtime data lives in a private git submodule mounted at `runtime/` (separate repo: `traveller-runtime`). Commits happen **inside the submodule** — the parent (public) repo only records the new submodule pointer.
+
+Step A — commit the new data inside the submodule:
+
 ```bash
+cd runtime
 git add history/observations.jsonl reports/ state/rotation.json
+git commit -m "chore: weekly scan <run_date> — N deals (<scope>)"
+git push
+cd ..
+```
+
+Step B — record the new submodule commit in the parent repo:
+
+```bash
+git add runtime
 git commit -m "chore(traveller): weekly scan <run_date> — N deals (<scope>)"
 ```
 
-Pushing to a remote is optional and depends on whether the repo has one. Run `git remote -v` first:
+Pushing the parent repo is optional. Run `git remote -v` first:
 
 - If a remote is configured, `git push`. If the push is rejected, email a failure notice (subject: `⚠️ Travel scan FAILED — push rejected`).
 - If no remote is configured, stop after the commit. Local-only is acceptable for this repo.
+
+If the submodule push (Step A) fails, email a failure notice (subject: `⚠️ Travel scan FAILED — runtime push rejected`) and STOP — do not commit the parent repo with an unpushed submodule pointer.
 
 ---
 
