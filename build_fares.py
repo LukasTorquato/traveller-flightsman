@@ -10,7 +10,7 @@ to simulate a week of market drift. Pricing remains realistic enough for the
 deal-detection math to exercise its full logic on a growing baseline.
 
 Usage:
-  python3 scripts/build_synthetic_fares.py <scope> <run_date>
+  python build_fares.py <scope> <run_date>
   scope ∈ {europe, intercontinental}
 """
 import json
@@ -20,7 +20,7 @@ import pathlib
 from collections import defaultdict
 from datetime import date, timedelta
 
-ROOT = pathlib.Path(__file__).parent.parent
+ROOT = pathlib.Path(__file__).parent
 HIST = ROOT / "runtime" / "history" / "observations.jsonl"
 CONFIG = ROOT / "config"
 STATE = ROOT / "runtime" / "state" / "rotation.json"
@@ -122,23 +122,15 @@ def profile_for(category, nights):
     }[category]
 
 
-def departure_window(nights, run_date_s, settings):
-    """Return a representative departure date inside the configured policy."""
+def departure_window(category, run_date_s):
     base = date.fromisoformat(run_date_s)
-    policy = settings["departure_date_policy"]
-    near_term = policy["near_term"]
-    if nights <= near_term["max_nights"]:
-        start, end = near_term["departure_days_from_run"]
-        return base + timedelta(days=(start + end) // 2)
-
-    future = policy["future"]
-    if nights >= future["min_nights"]:
-        year = base.year + future["departure_calendar_year_offset"]
-        first_day = date(year, 1, 1)
-        next_year = date(year + 1, 1, 1)
-        return first_day + timedelta(days=(next_year - first_day).days // 2)
-
-    raise ValueError(f"No departure-date policy covers a {nights}-night trip")
+    offsets = {
+        "europe_short_haul": 49,
+        "europe_long_haul": 56,
+        "intercontinental_asia": 150,
+        "intercontinental_south_america": 150,
+    }
+    return base + timedelta(days=offsets[category])
 
 
 def anchor_from_priors(iata, priors, category):
@@ -180,7 +172,7 @@ def build_route_payload(r, settings, priors, rng, run_date_s):
     category = r["category"]
     nights = nights_for(category)
     profile = profile_for(category, nights)
-    dep = departure_window(nights, run_date_s, settings)
+    dep = departure_window(category, run_date_s)
     ret = dep + timedelta(days=nights)
     flight_base, hotel_base, airbnb_base, package_base = anchor_from_priors(
         r["iata"], priors, category
